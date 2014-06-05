@@ -17,7 +17,6 @@ Map.init = function(){
         attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(self.map);
 
-    self.map.options.minZoom = 16;
     self.map.doubleClickZoom.disable(); 
     self.map.on('dblclick', self.dblclick);
 };
@@ -28,9 +27,11 @@ Map.dblclick = function(e){
     var prev = self.points[self.points.length - 1];
     self.points.push(point);
 
-    L.circleMarker(point, {fillOpacity: 1}).addTo(self.map);
+    L.circleMarker(point, {radius: 7, fillOpacity: 1})
+        .addTo(self.map);
     if (prev){
-        L.polyline([prev, point], {color: 'red'}).addTo(self.map);
+        L.polyline([prev, point], {color: 'red'})
+            .addTo(self.map);
     }
     self.drawPowerPoles();
 };
@@ -40,9 +41,9 @@ Map.drawPowerPoles = function(){
         var pointB = this.points[i + 1];
         if (pointB){
             var poles = this.generatePoints(pointA, pointB);
-            console.log(poles)
             for (var j = 0, point; point = poles[j]; j++){
-                L.circle(point, 5, {color: 'teal', fillOpacity: 1}).addTo(this.map);
+                L.circleMarker(point, {radius: 5, color: 'teal', fillOpacity: 1})
+                    .addTo(this.map);
             }
         }
     };
@@ -64,8 +65,6 @@ Map.generatePoints = function(pointA, pointB, interval){
 };
 
 Map.distBetweenPoints = function(latA, lonA, latB, lonB){
-    console.log(latA, lonA, latB, lonB)
-
     // http://stackoverflow.com/questions/27928/how-do-i-calculate-distance-between-two-latitude-longitude-points
     var R = 6371; // Radius of the earth in km    
     var dLat = this.degToRad(latB - latA);
