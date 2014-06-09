@@ -11,9 +11,10 @@ Map.init = function(){
     // Initialize map
     var self = this;
     self.map = L.map('map', {zoomAnimation: false, inertia: false})
-        .setView([40.809400, -73.960029], 16);
+        .setView([13.61105531, -5.77599353], 16);
 
-    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    L.tileLayer('http://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        subdomains: '0123',
         attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(self.map);
 
