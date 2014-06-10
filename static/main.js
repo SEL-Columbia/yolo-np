@@ -1,6 +1,8 @@
 
 var state = {
-    mode: null    
+    mode: null,
+    selectedNode: null,
+    points: []
 };
 
 var width = window.innerWidth,
