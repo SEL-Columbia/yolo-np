@@ -1,4 +1,100 @@
-(function($){
+
+var width = window.innerWidth,
+    height = window.innerHeight;
+
+var tile = d3.geo.tile()
+    .size([width, height]);
+
+var projection = d3.geo.mercator()
+    .scale((1 << 12) / 2 / Math.PI)
+    .translate([width / 2, height / 2]);
+
+var center = projection([-5.77599353, 13.61105531]);
+
+var path = d3.geo.path()
+    .projection(projection);
+
+var zoom = d3.behavior.zoom()
+    .scale(projection.scale() * 2 * Math.PI)
+    .scaleExtent([1 << 11, 1 << 14])
+    .translate([width - center[0], height - center[1]])
+    .on('zoom', zoomed);
+
+var svg = d3.select('#map').append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+var raster = svg.append('g')
+    .on("click", function(d) {
+        zoomed();
+
+        console.log(projection.invert(d3.mouse(this)));
+    });
+
+var vector = svg.append('g');
+
+function what(){
+    var coordinates = projection([-5.77599353, 13.61105531]);
+
+    vector.append('svg:circle')
+        .attr('cx', coordinates[0])
+        .attr('cy', coordinates[1])
+        .attr('r', 5)
+        .attr('class', 'node');
+}
+
+/*
+d3.json("/d/4090846/us.json", function(error, us) {
+  svg.call(zoom);
+  vector.datum(topojson.mesh(us, us.objects.states));
+  zoomed();
+});
+*/
+
+
+
+svg.call(zoom);
+
+
+zoomed();
+
+
+function zoomed() {
+    var tiles = tile
+        .scale(zoom.scale())
+        .translate(zoom.translate())
+        ();
+    
+    projection
+        .scale(zoom.scale() / 2 / Math.PI)
+        .translate(zoom.translate());
+    
+    vector
+        .attr("d", path);
+    
+    var image = raster
+        .attr("transform", "scale(" + tiles.scale + ")translate(" + tiles.translate + ")")
+        .selectAll("image")
+        .data(tiles, function(d) { return d; });
+    
+    image.exit()
+        .remove();
+    
+    image.enter().append("image")
+        .attr("xlink:href", function(d) {
+            return 'http://mt' + Math.round(Math.random() * 3) + '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
+        })
+        .attr("width", 1)
+        .attr("height", 1)
+        .attr("x", function(d) { return d[0]; })
+        .attr("y", function(d) { return d[1]; });
+}
+
+
+
+
+
+
 
 
 Map = {
@@ -11,7 +107,7 @@ Map.init = function(){
     // Initialize map
     var self = this;
     self.map = L.map('map', {zoomAnimation: false, inertia: false})
-        .setView([13.61105531, -5.77599353], 16);
+        .setView([13.61105531, -5.77599353], 15);
 
     L.tileLayer('http://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
         subdomains: '0123',
@@ -84,9 +180,5 @@ Map.degToRad = function(deg){
 Map.radToDeg = function(rad){
     return rad * 180 / Math.PI;
 };
-
-
-})(jQuery);
-
 
 
