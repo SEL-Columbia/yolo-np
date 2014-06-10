@@ -24,14 +24,15 @@ var svg = d3.select('#map').append('svg')
     .attr('width', width)
     .attr('height', height);
 
-var raster = svg.append('g')
-    .on("click", function(d) {
-        zoomed();
+var raster = svg.append('g');
 
-        console.log(projection.invert(d3.mouse(this)));
-    });
-
-var vector = svg.append('g');
+var vector = svg
+    .on('click', function(d) {
+        var ll = projection.scale(zoom.scale() / 2 / Math.PI)
+            .translate(zoom.translate())
+            .invert(d3.mouse(this));
+        console.log(ll);
+    })
 
 function what(){
     var coordinates = projection([-5.77599353, 13.61105531]);
@@ -42,14 +43,6 @@ function what(){
         .attr('r', 5)
         .attr('class', 'node');
 }
-
-/*
-d3.json("/d/4090846/us.json", function(error, us) {
-  svg.call(zoom);
-  vector.datum(topojson.mesh(us, us.objects.states));
-  zoomed();
-});
-*/
 
 
 
