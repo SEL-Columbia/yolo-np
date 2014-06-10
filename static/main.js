@@ -16,40 +16,34 @@ var path = d3.geo.path()
 
 var zoom = d3.behavior.zoom()
     .scale(projection.scale() * 2 * Math.PI)
-    .scaleExtent([1 << 11, 1 << 14])
+    .scaleExtent([1 << 11, 1 << 25])
     .translate([width - center[0], height - center[1]])
     .on('zoom', zoomed);
 
-var svg = d3.select('#map').append('svg')
+var svg = d3.select('#map')
+    .on('click', click)
+    .append('svg')
     .attr('width', width)
     .attr('height', height);
 
 var raster = svg.append('g');
-
-var vector = svg
-    .on('click', function(d) {
-        var ll = projection.scale(zoom.scale() / 2 / Math.PI)
-            .translate(zoom.translate())
-            .invert(d3.mouse(this));
-        console.log(ll);
-    })
-
-function what(){
-    var coordinates = projection([-5.77599353, 13.61105531]);
-
-    vector.append('svg:circle')
-        .attr('cx', coordinates[0])
-        .attr('cy', coordinates[1])
-        .attr('r', 5)
-        .attr('class', 'node');
-}
-
+var vector = svg.append('g');
 
 
 svg.call(zoom);
-
-
 zoomed();
+
+function click(d) {
+    var coordinates = projection.invert(d3.mouse(this));
+    //coordinates = projection(coordinates);
+    console.log(coordinates)
+    vector.append('svg:circle')
+        .datum(coordinates)
+        .attr('cx', function(d) { return projection(d)[0]; })
+        .attr('cy', function(d) { return projection(d)[1]; })
+        .attr('r', 5)
+        .attr('class', 'node');
+}
 
 
 function zoomed() {
@@ -61,10 +55,7 @@ function zoomed() {
     projection
         .scale(zoom.scale() / 2 / Math.PI)
         .translate(zoom.translate());
-    
-    vector
-        .attr("d", path);
-    
+
     var image = raster
         .attr("transform", "scale(" + tiles.scale + ")translate(" + tiles.translate + ")")
         .selectAll("image")
@@ -81,6 +72,10 @@ function zoomed() {
         .attr("height", 1)
         .attr("x", function(d) { return d[0]; })
         .attr("y", function(d) { return d[1]; });
+
+    vector.selectAll('circle')
+        .attr('cx', function(d) { return projection(d)[0]; })
+        .attr('cy', function(d) { return projection(d)[1]; });
 }
 
 
