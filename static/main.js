@@ -1,4 +1,8 @@
 
+var state = {
+    mode: null    
+};
+
 var width = window.innerWidth,
     height = window.innerHeight;
 
@@ -21,7 +25,7 @@ var zoom = d3.behavior.zoom()
     .on('zoom', zoomed);
 
 var svg = d3.select('#map')
-    .on('click', click)
+    .on('dblclick', dblclick)
     .append('svg')
     .attr('width', width)
     .attr('height', height);
@@ -30,19 +34,40 @@ var raster = svg.append('g');
 var vector = svg.append('g');
 
 
-svg.call(zoom);
+svg.call(zoom)
+    .on('dblclick.zoom', null);
+
 zoomed();
 
-function click(d) {
-    var coordinates = projection.invert(d3.mouse(this));
-    //coordinates = projection(coordinates);
-    console.log(coordinates)
-    vector.append('svg:circle')
-        .datum(coordinates)
-        .attr('cx', function(d) { return projection(d)[0]; })
-        .attr('cy', function(d) { return projection(d)[1]; })
-        .attr('r', 5)
-        .attr('class', 'node');
+var cursorCoordinates = d3.select('.cursor_coordinates');
+
+d3.select('body')
+    .on('mousemove', function(){
+        var c = projection.invert(d3.mouse(this));
+        cursorCoordinates.html(c[0].toFixed(4) + ', ' + c[1].toFixed(4));
+    })
+    .on('keydown', function(){
+        var key = d3.event.keyCode;
+        console.log(key);
+        if (key === 27) {
+            // Escape
+            state.mode = null;
+        } else if (key === 80) {
+            // p, for point
+            state.mode = 'start_point';
+        }
+    });
+
+function dblclick(d) {
+    if (state.mode === 'point'){
+        var coordinates = projection.invert(d3.mouse(this));
+        vector.append('svg:circle')
+            .datum(coordinates)
+            .attr('cx', function(d) { return projection(d)[0]; })
+            .attr('cy', function(d) { return projection(d)[1]; })
+            .attr('r', 5)
+            .attr('class', 'node');
+    }
 }
 
 
