@@ -2,22 +2,29 @@ html, body {
     height: 100%;
     margin: 0;
     font-family: 'Helvetica Neue', sans-serif;
+    font-size: 16px;
+    color: #333;
     overflow: hidden;
+}
+
+h1 {
+    font-size: 2em;
+    font-weight: 200;
 }
 
 
 .node {
     cursor: pointer;
-    fill: green;
+    fill: red;
 }
 .node:hover {
-    fill: red;
+    fill: darkred;
 }
 
 .edge {
     fill: none;
     stroke: purple;
-    stroke-width: 0.3px;
+    stroke-width: 3px;
     stroke-linecap: round;
 }
 .edge.coast {
@@ -78,14 +85,47 @@ html, body {
     font-size: 14px;
     font-weight: 200;
     text-shadow: 1px 1px 1px #333;
+    z-index: 2;
 }
 
 #map {
     height: 100%;
+    z-index: 1;
 }
 
 
-
+.costs {
+    display: none;
+    height: 100%;
+    background: white;
+    padding: 80px 25px;
+    font-weight: 200;
+    z-index: 10;
+}
+.costs_table {
+    color: #777;
+}
+.costs_table th {
+    font-weight: 500;
+}
+.costs_table th,
+.costs_table td {
+    padding: 8px 0;
+}
+.costs_table_supplies {
+    width: 200px;
+    text-align: left;
+}
+.costs_table_amount,
+.costs_table_cost {
+    width: 100px;
+    text-align: right;
+}
+.costs_total td {
+    border-top: 1px solid #ddd;
+    padding-top: 10px;
+    margin-top: 10px;
+}
 
 
 

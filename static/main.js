@@ -27,12 +27,11 @@ Yolo.init = function() {
         .on('zoom', this.onzoom);
 
     var svg = d3.select('#map')
-        .append('svg')
         .attr('width', width)
         .attr('height', height)
-        .on('dblclick.zoom', null)
         .on('click', this.onclick)
-        .call(this.zoom);
+        .call(this.zoom)
+        .on('dblclick.zoom', null);
 
     this.raster = svg.append('g');
     this.vector = svg.append('g');
@@ -62,24 +61,28 @@ Yolo.keydown = function() {
         self.vector
             .selectAll('.cursor')
             .remove();
+        d3.selectAll('.costs')
+            .attr('style', 'display:none');
     } else if (key === 80) {
         // p, for point
         self.mode = 'point';
         self.setStatus('Point mode');
+    } else if (key === 67) {
+        // c, for costs
+        self.getCosts();
+        d3.select('.costs')
+            .attr('style', 'display:block');
     }
 };
 
 Yolo.onclick = function(d) {
     var self = Yolo;
-    if (self.mode === 'point'){
+    if (self.mode === 'point') {
         console.log('yo')
         var coordinates = self.projection.invert(d3.mouse(this));
-        self.vector.append('svg:circle')
-            .datum(coordinates)
-            .attr('cx', function(d) { return self.projection(d)[0]; })
-            .attr('cy', function(d) { return self.projection(d)[1]; })
-            .attr('r', 5)
-            .attr('class', 'node');
+        self.currentNode = coordinates;
+        self.points.push(coordinates);
+        self.drawPoints();
     }
 };
 
@@ -111,9 +114,13 @@ Yolo.onzoom = function() {
         .attr('x', function(d) { return d[0]; })
         .attr('y', function(d) { return d[1]; });
 
+    // Reproject vector layer
     self.vector.selectAll('circle')
         .attr('cx', function(d) { return self.projection(d)[0]; })
         .attr('cy', function(d) { return self.projection(d)[1]; });
+    
+    self.vector.selectAll('path')
+        .attr('d', self.path);
 };
 
 Yolo.mousemove = function() {
@@ -125,10 +132,23 @@ Yolo.mousemove = function() {
 
     if (self.mode === 'point') {
         self.vector
-            .select('.cursor')
+            .selectAll('.cursor')
             .remove();
 
-        self.vector.append('svg:circle')
+        if (self.currentNode) {
+            self.vector.append('path')
+                .datum({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: [self.currentNode, coord]
+                    }
+                })
+                .attr('d', self.path)
+                .attr('class', 'cursor edge');
+        }
+
+        self.vector.append('circle')
             .datum(coord)
             .attr('cx', function(d) { return self.projection(d)[0]; })
             .attr('cy', function(d) { return self.projection(d)[1]; })
@@ -137,18 +157,53 @@ Yolo.mousemove = function() {
     }
 };
 
-Yolo.drawPowerPoles = function(){
-    for (var i = 0, pointA; pointA = this.points[i]; i++){
+Yolo.drawPoints = function() {
+    var self = this;
+
+    // Draw lines
+    self.vector
+        .append('path')
+        .datum({
+            type: 'Feature',
+            geometry: {
+                type: 'LineString',
+                coordinates: self.points
+            }
+        })
+        .attr('d', self.path)
+        .attr('class', 'edge');
+
+    // Draw nodes
+    self.vector
+        .selectAll('.node')
+        .remove();
+
+    self.vector
+        .selectAll('.node')
+        .data(self.points)
+        .enter()
+        .append('circle')
+        .attr('cx', function(d) { return self.projection(d)[0]; })
+        .attr('cy', function(d) { return self.projection(d)[1]; })
+        .attr('r', 5)
+        .attr('class', 'node');
+};
+
+Yolo.getCosts = function() {
+    var dist = 0;
+    for (var i=0, pointA; pointA = this.points[i]; i++) {
         var pointB = this.points[i + 1];
         if (pointB){
-            var poles = this.generatePoints(pointA, pointB);
-            for (var j = 0, point; point = poles[j]; j++){
-                L.circleMarker(point, {radius: 5, color: 'teal', fillOpacity: 1})
-                    .addTo(this.map);
-            }
+            dist += this.distBetweenPoints(pointA[1], pointA[0], pointB[1], pointB[0]);
         }
+    }
+    return {
+        distance: dist,
+        num_poles: Math.floor(dist / 100),
+        total_demand: 10000
     };
 };
+
 
 Yolo.generatePoints = function(pointA, pointB, interval){
     // Returns a list of points between A and B at intervals of X meters

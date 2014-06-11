@@ -17,7 +17,46 @@
         </div>
     </div>
     <div class="cursor_coordinates"></div>
-    <div id="map"></div>
+    <div class="costs">
+        <h1>Grid Costs</h1>
+        <table class="costs_table">
+            <thead>
+                <tr>
+                    <th class="costs_table_supplies">Supplies</th>
+                    <th class="costs_table_amount">Amount</th>
+                    <th class="costs_table_cost">Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="costs_table_supplies">Power poles</td>
+                    <td class="costs_table_amount">15</td>
+                    <td class="costs_table_cost">$10,000</td>
+                </tr>
+                <tr>
+                    <td class="costs_table_supplies">Medium Wire</td>
+                    <td class="costs_table_amount">10 km</td>
+                    <td class="costs_table_cost">$20,000</td>
+                </tr>
+                <tr>
+                    <td class="costs_table_supplies">Insulators</td>
+                    <td class="costs_table_amount">30</td>
+                    <td class="costs_table_cost">$10,000</td>
+                </tr>
+                <tr>
+                    <td class="costs_table_supplies">Transformers</td>
+                    <td class="costs_table_amount">10</td>
+                    <td class="costs_table_cost">$10,000</td>
+                </tr>
+                <tr class="costs_total">
+                    <td class="costs_table_supplies">Total</td>
+                    <td class="costs_table_amount"></td>
+                    <td class="costs_table_cost">$53,000</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <svg id="map"></svg>
     
     <script src="http://d3js.org/d3.v3.min.js"></script>
     <script src="http://d3js.org/d3.geo.tile.v0.min.js"></script>
