@@ -1,154 +1,143 @@
-
-var state = {
+Yolo = {
     mode: null,
-    selectedNode: null,
+    currentNode: null,
     points: []
 };
 
-var width = window.innerWidth,
-    height = window.innerHeight;
+Yolo.init = function() {
+    var width = window.innerWidth,
+        height = window.innerHeight;
 
-var tile = d3.geo.tile()
-    .size([width, height]);
+    this.tile = d3.geo.tile()
+        .size([width, height]);
 
-var projection = d3.geo.mercator()
-    .scale((1 << 12) / 2 / Math.PI)
-    .translate([width / 2, height / 2]);
+    this.projection = d3.geo.mercator()
+        .scale((1 << 12) / 2 / Math.PI)
+        .translate([width / 2, height / 2]);
 
-var center = projection([-5.77599353, 13.61105531]);
+    this.path = d3.geo.path()
+        .projection(this.projection);
 
-var path = d3.geo.path()
-    .projection(projection);
+    var center = this.projection([-5.77599353, 13.61105531]);
 
-var zoom = d3.behavior.zoom()
-    .scale(projection.scale() * 2 * Math.PI)
-    .scaleExtent([1 << 11, 1 << 25])
-    .translate([width - center[0], height - center[1]])
-    .on('zoom', zoomed);
+    this.zoom = d3.behavior.zoom()
+        .scale(this.projection.scale() * 2 * Math.PI)
+        .scaleExtent([1 << 11, 1 << 25])
+        .translate([width - center[0], height - center[1]])
+        .on('zoom', this.onzoom);
 
-var svg = d3.select('#map')
-    .on('dblclick', dblclick)
-    .append('svg')
-    .attr('width', width)
-    .attr('height', height);
+    var svg = d3.select('#map')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .on('dblclick.zoom', null)
+        .on('click', this.onclick)
+        .call(this.zoom);
 
-var raster = svg.append('g');
-var vector = svg.append('g');
+    this.raster = svg.append('g');
+    this.vector = svg.append('g');
+
+    d3.select('body')
+        .on('mousemove', this.mousemove)
+        .on('keydown', this.keydown);
+
+    this.onzoom();
+};
 
 
-svg.call(zoom)
-    .on('dblclick.zoom', null);
+Yolo.setStatus = function(status) {
+    d3.select('.header_status')
+        .html(status);
+};
 
-zoomed();
+Yolo.keydown = function() {
+    var self = Yolo;
+    var key = d3.event.keyCode;
+    console.log(key);
+    if (key === 27) {
+        // Escape
+        self.mode = null;
+        self.currentNode = null;
+        self.setStatus('');
+        self.vector
+            .selectAll('.cursor')
+            .remove();
+    } else if (key === 80) {
+        // p, for point
+        self.mode = 'point';
+        self.setStatus('Point mode');
+    }
+};
 
-var cursorCoordinates = d3.select('.cursor_coordinates');
-
-d3.select('body')
-    .on('mousemove', function(){
-        var c = projection.invert(d3.mouse(this));
-        cursorCoordinates.html(c[0].toFixed(4) + ', ' + c[1].toFixed(4));
-    })
-    .on('keydown', function(){
-        var key = d3.event.keyCode;
-        console.log(key);
-        if (key === 27) {
-            // Escape
-            state.mode = null;
-        } else if (key === 80) {
-            // p, for point
-            state.mode = 'start_point';
-        }
-    });
-
-function dblclick(d) {
-    if (state.mode === 'point'){
-        var coordinates = projection.invert(d3.mouse(this));
-        vector.append('svg:circle')
+Yolo.onclick = function(d) {
+    var self = Yolo;
+    if (self.mode === 'point'){
+        console.log('yo')
+        var coordinates = self.projection.invert(d3.mouse(this));
+        self.vector.append('svg:circle')
             .datum(coordinates)
-            .attr('cx', function(d) { return projection(d)[0]; })
-            .attr('cy', function(d) { return projection(d)[1]; })
+            .attr('cx', function(d) { return self.projection(d)[0]; })
+            .attr('cy', function(d) { return self.projection(d)[1]; })
             .attr('r', 5)
             .attr('class', 'node');
     }
-}
+};
 
-
-function zoomed() {
-    var tiles = tile
-        .scale(zoom.scale())
-        .translate(zoom.translate())
+Yolo.onzoom = function() {
+    var self = Yolo;
+    var tiles = self.tile
+        .scale(self.zoom.scale())
+        .translate(self.zoom.translate())
         ();
     
-    projection
-        .scale(zoom.scale() / 2 / Math.PI)
-        .translate(zoom.translate());
+    self.projection
+        .scale(self.zoom.scale() / 2 / Math.PI)
+        .translate(self.zoom.translate());
 
-    var image = raster
-        .attr("transform", "scale(" + tiles.scale + ")translate(" + tiles.translate + ")")
-        .selectAll("image")
+    var image = self.raster
+        .attr('transform', 'scale(' + tiles.scale + ')translate(' + tiles.translate + ')')
+        .selectAll('image')
         .data(tiles, function(d) { return d; });
     
     image.exit()
         .remove();
     
-    image.enter().append("image")
-        .attr("xlink:href", function(d) {
+    image.enter().append('image')
+        .attr('xlink:href', function(d) {
             return 'http://mt' + Math.round(Math.random() * 3) + '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
         })
-        .attr("width", 1)
-        .attr("height", 1)
-        .attr("x", function(d) { return d[0]; })
-        .attr("y", function(d) { return d[1]; });
+        .attr('width', 1)
+        .attr('height', 1)
+        .attr('x', function(d) { return d[0]; })
+        .attr('y', function(d) { return d[1]; });
 
-    vector.selectAll('circle')
-        .attr('cx', function(d) { return projection(d)[0]; })
-        .attr('cy', function(d) { return projection(d)[1]; });
-}
-
-
-
-
-
-
-
-
-Map = {
-    map: null,
-    buildMode: false,
-    points: []
+    self.vector.selectAll('circle')
+        .attr('cx', function(d) { return self.projection(d)[0]; })
+        .attr('cy', function(d) { return self.projection(d)[1]; });
 };
 
-Map.init = function(){
-    // Initialize map
-    var self = this;
-    self.map = L.map('map', {zoomAnimation: false, inertia: false})
-        .setView([13.61105531, -5.77599353], 15);
+Yolo.mousemove = function() {
+    var self = Yolo;
+    var coord = self.projection.invert(d3.mouse(this));
 
-    L.tileLayer('http://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-        subdomains: '0123',
-        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(self.map);
+    d3.select('.cursor_coordinates')
+        .html(coord[0].toFixed(4) + ', ' + coord[1].toFixed(4));
 
-    self.map.doubleClickZoom.disable(); 
-    self.map.on('dblclick', self.dblclick);
-};
+    if (self.mode === 'point') {
+        self.vector
+            .select('.cursor')
+            .remove();
 
-Map.dblclick = function(e){
-    var self = Map;
-    var point = e.latlng;
-    var prev = self.points[self.points.length - 1];
-    self.points.push(point);
-
-    L.circleMarker(point, {radius: 7, fillOpacity: 1})
-        .addTo(self.map);
-    if (prev){
-        L.polyline([prev, point], {color: 'red'})
-            .addTo(self.map);
+        self.vector.append('svg:circle')
+            .datum(coord)
+            .attr('cx', function(d) { return self.projection(d)[0]; })
+            .attr('cy', function(d) { return self.projection(d)[1]; })
+            .attr('r', 5)
+            .attr('class', 'cursor node');
     }
-    self.drawPowerPoles();
 };
 
-Map.drawPowerPoles = function(){
+Yolo.drawPowerPoles = function(){
     for (var i = 0, pointA; pointA = this.points[i]; i++){
         var pointB = this.points[i + 1];
         if (pointB){
@@ -161,7 +150,7 @@ Map.drawPowerPoles = function(){
     };
 };
 
-Map.generatePoints = function(pointA, pointB, interval){
+Yolo.generatePoints = function(pointA, pointB, interval){
     // Returns a list of points between A and B at intervals of X meters
     var self = this;
     interval = interval || 100;
@@ -176,7 +165,7 @@ Map.generatePoints = function(pointA, pointB, interval){
     return points;
 };
 
-Map.distBetweenPoints = function(latA, lonA, latB, lonB){
+Yolo.distBetweenPoints = function(latA, lonA, latB, lonB){
     // http://stackoverflow.com/questions/27928/how-do-i-calculate-distance-between-two-latitude-longitude-points
     var R = 6371; // Radius of the earth in km    
     var dLat = this.degToRad(latB - latA);
@@ -188,11 +177,11 @@ Map.distBetweenPoints = function(latA, lonA, latB, lonB){
     return R * c; // Distance in km
 };
 
-Map.degToRad = function(deg){
+Yolo.degToRad = function(deg){
     return deg * Math.PI / 180;
 };
 
-Map.radToDeg = function(rad){
+Yolo.radToDeg = function(rad){
     return rad * 180 / Math.PI;
 };
 
