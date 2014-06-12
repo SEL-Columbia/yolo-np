@@ -97,13 +97,15 @@ h1 {
 .costs {
     display: none;
     height: 100%;
-    background: white;
+    color: white;
+    background: #3498db;
     padding: 80px 25px;
     font-weight: 200;
     z-index: 10;
 }
 .costs_table {
-    color: #777;
+    color: #eee;
+    font-size: 18px;
 }
 .costs_table th {
     font-weight: 500;
@@ -113,12 +115,12 @@ h1 {
     padding: 8px 0;
 }
 .costs_table_supplies {
-    width: 200px;
+    width: 350px;
     text-align: left;
 }
 .costs_table_amount,
 .costs_table_cost {
-    width: 100px;
+    width: 120px;
     text-align: right;
 }
 .costs_total td {

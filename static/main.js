@@ -22,7 +22,7 @@ Yolo.init = function() {
 
     this.zoom = d3.behavior.zoom()
         .scale(this.projection.scale() * 2 * Math.PI)
-        .scaleExtent([1 << 11, 1 << 25])
+        .scaleExtent([1 << 11, 1 << 30])
         .translate([width - center[0], height - center[1]])
         .on('zoom', this.onzoom);
 
@@ -199,7 +199,7 @@ Yolo.getCosts = function() {
     }
     return {
         distance: dist,
-        num_poles: Math.floor(dist / 100),
+        num_poles: Math.floor(dist * 10),
         total_demand: 10000
     };
 };
