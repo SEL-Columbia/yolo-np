@@ -22,7 +22,7 @@ Yolo.init = function() {
 
     this.zoom = d3.behavior.zoom()
         .scale(this.projection.scale() * 2 * Math.PI)
-        .scaleExtent([1 << 11, 1 << 30])
+        .scaleExtent([1 << 11, 1 << 28])
         .translate([width - center[0], height - center[1]])
         .on('zoom', this.onzoom);
 
@@ -41,6 +41,75 @@ Yolo.init = function() {
         .on('keydown', this.keydown);
 
     this.onzoom();
+};
+
+
+Yolo.initTileCache = function() {
+    var request = window.indexedDB.open('tileCache', 5);
+    var db;
+
+    request.onerror = function(event) {
+        console.log("Error creating/accessing IndexedDB database");
+    };
+
+    request.onsuccess = function(event) {
+        console.log("Success creating/accessing IndexedDB database");
+        db = request.result;
+        db.onerror = function(event) {
+            console.log("Error creating/accessing IndexedDB database");
+        };
+        getImage();
+    }
+
+    request.onupgradeneeded = function (event) {
+        var db = event.target.result;
+        db.createObjectStore('tiles');
+    }
+
+    function getImage() {
+        var url = 'http://mt1.google.com/vt/lyrs=y&x=7&y=7&z=4';
+        var xhr = new XMLHttpRequest();
+
+        xhr.open("GET", url, true);
+        xhr.responseType = "blob";
+        xhr.addEventListener("load", function() {
+            if (xhr.status === 200) {
+                console.log("Image retrieved");
+                
+                // Blob as response
+                var blob = xhr.response;
+                console.log("Blob:" + blob);
+
+                // Put the received blob into IndexedDB
+                putImageInDb(blob);
+            }
+        }, false);
+        xhr.send();
+    }
+
+    function putImageInDb(blob) {
+        console.log('imageeee')
+        var store = db.transaction(['tiles'], 'readwrite')
+            .objectStore('tiles');
+        store.put(blob, 'image2');
+        store.get('image2').onsuccess = function(event) {
+            var imgFile = event.target.result;
+            console.log("Got elephant!" + imgFile);
+
+            // Get window.URL object
+            var URL = window.URL || window.webkitURL;
+
+            // Create and revoke ObjectURL
+            var imgURL = URL.createObjectURL(imgFile);
+
+            // Set img src to ObjectURL
+            var imgElephant = document.getElementById("img");
+            imgElephant.setAttribute("src", imgURL);
+
+            // Revoking ObjectURL
+            URL.revokeObjectURL(imgURL);
+        };
+    };
 };
 
 

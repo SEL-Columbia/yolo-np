@@ -9,7 +9,8 @@ html, body {
 
 h1 {
     font-size: 2em;
-    font-weight: 200;
+    font-weight: 500;
+    color: rgba(255,255,255,0.7);
 }
 
 
@@ -42,7 +43,6 @@ h1 {
     width: 100%;
     z-index: 10;
     padding: 15px;
-    background: rgba(0,0,0,0.75);
     box-sizing: border-box;
 }
 .header_logo {
@@ -103,15 +103,26 @@ h1 {
     font-weight: 200;
     z-index: 10;
 }
+.costs_edit {
+    cursor: pointer;
+    color: #ddd;
+    font-size: 14px;
+    border-bottom: 1px dotted #ddd;
+    margin-left: 10px;
+}
 .costs_table {
-    color: #eee;
+    color: #fff;
     font-size: 18px;
+    border-spacing: 0;
 }
 .costs_table th {
     font-weight: 500;
+    font-size: 17px;
+    color: rgba(255,255,255,0.7);
+    padding: 8px 0;
 }
-.costs_table th,
 .costs_table td {
+    color: #eee;
     padding: 8px 0;
 }
 .costs_table_supplies {
