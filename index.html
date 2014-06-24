@@ -9,7 +9,6 @@
     <div class="header">
         <div class="header_logo">YoloNP</div>
         <div class="header_status">Welcome!</div>
-        <img id="img">
         <div class="header_control">
             Building
         </div>
@@ -71,7 +70,8 @@
     <script src="http://d3js.org/d3.geo.tile.v0.min.js"></script>
     <script src="static/main.js"></script>
     <script>
-        Yolo.init();
+        Yolo.initTileCache();
+        setTimeout(function(){ Yolo.init(); }, 1000);
     </script>
 </body>
 

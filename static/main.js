@@ -46,7 +46,7 @@ Yolo.init = function() {
 
 Yolo.initTileCache = function() {
     var request = window.indexedDB.open('tileCache', 5);
-    var db;
+    var self = this;
 
     request.onerror = function(event) {
         console.log("Error creating/accessing IndexedDB database");
@@ -54,64 +54,58 @@ Yolo.initTileCache = function() {
 
     request.onsuccess = function(event) {
         console.log("Success creating/accessing IndexedDB database");
-        db = request.result;
-        db.onerror = function(event) {
+        self.db = request.result;
+        self.db.onerror = function(event) {
             console.log("Error creating/accessing IndexedDB database");
         };
-        getImage();
-    }
+        //self.db.getObjectStore('tiles').clear();
+    };
 
-    request.onupgradeneeded = function (event) {
-        var db = event.target.result;
-        db.createObjectStore('tiles');
-    }
-
-    function getImage() {
-        var url = 'http://mt1.google.com/vt/lyrs=y&x=7&y=7&z=4';
-        var xhr = new XMLHttpRequest();
-
-        xhr.open("GET", url, true);
-        xhr.responseType = "blob";
-        xhr.addEventListener("load", function() {
-            if (xhr.status === 200) {
-                console.log("Image retrieved");
-                
-                // Blob as response
-                var blob = xhr.response;
-                console.log("Blob:" + blob);
-
-                // Put the received blob into IndexedDB
-                putImageInDb(blob);
-            }
-        }, false);
-        xhr.send();
-    }
-
-    function putImageInDb(blob) {
-        console.log('imageeee')
-        var store = db.transaction(['tiles'], 'readwrite')
-            .objectStore('tiles');
-        store.put(blob, 'image2');
-        store.get('image2').onsuccess = function(event) {
-            var imgFile = event.target.result;
-            console.log("Got elephant!" + imgFile);
-
-            // Get window.URL object
-            var URL = window.URL || window.webkitURL;
-
-            // Create and revoke ObjectURL
-            var imgURL = URL.createObjectURL(imgFile);
-
-            // Set img src to ObjectURL
-            var imgElephant = document.getElementById("img");
-            imgElephant.setAttribute("src", imgURL);
-
-            // Revoking ObjectURL
-            URL.revokeObjectURL(imgURL);
-        };
+    request.onupgradeneeded = function(event) {
+        self.db = event.target.result;
+        self.db.createObjectStore('tiles');
     };
 };
 
+Yolo.cacheImage = function(url) {
+    var self = this;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'blob';
+    xhr.addEventListener('load', function() {
+        if (xhr.status === 200) {
+            self.db
+                .transaction(['tiles'], 'readwrite')
+                .objectStore('tiles')
+                .put(xhr.response, url);
+        }
+    }, false);
+    xhr.send();
+};
+
+Yolo.setCachedImage = function(url, imgElement) {
+    var self = this;
+    var store = self.db
+        .transaction(['tiles'], 'readwrite')
+        .objectStore('tiles');
+    var request = store.get(url);
+
+    request.onsuccess = function(event) {
+        var imgFile = event.target.result;
+        if (imgFile) {
+            var URL = window.URL || window.webkitURL;
+            var imgURL = URL.createObjectURL(imgFile);
+            imgElement.setAttribute('src', imgURL);
+            console.log('got cache', imgURL);
+        } else {
+            console.log('caching', url);
+            self.cacheImage(url);
+        }
+    };
+    request.onerror = function(event) {
+        console.log('error');
+    };
+};
 
 Yolo.setStatus = function(status) {
     d3.select('.header_status')
@@ -176,7 +170,9 @@ Yolo.onzoom = function() {
     
     image.enter().append('image')
         .attr('xlink:href', function(d) {
-            return 'http://mt' + Math.round(Math.random() * 3) + '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
+            var url = 'http://mt' + Math.round(Math.random() * 3) + '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
+            self.setCachedImage(url, this);
+            return url;
         })
         .attr('width', 1)
         .attr('height', 1)
