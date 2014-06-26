@@ -67,10 +67,10 @@ Yolo.initTileCache = function() {
     };
 };
 
-Yolo.cacheImage = function(url) {
+Yolo.cacheImage = function(url, imgElement) {
     var self = this;
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
+    xhr.open('GET', 'http://mt' + Math.round(Math.random() * 3) + url, true);
     xhr.responseType = 'blob';
     xhr.addEventListener('load', function() {
         if (xhr.status === 200) {
@@ -78,6 +78,7 @@ Yolo.cacheImage = function(url) {
                 .transaction(['tiles'], 'readwrite')
                 .objectStore('tiles')
                 .put(xhr.response, url);
+            self.setCachedImage(url, imgElement);
         }
     }, false);
     xhr.send();
@@ -95,11 +96,11 @@ Yolo.setCachedImage = function(url, imgElement) {
         if (imgFile) {
             var URL = window.URL || window.webkitURL;
             var imgURL = URL.createObjectURL(imgFile);
-            imgElement.setAttribute('src', imgURL);
+            imgElement.setAttribute('href', imgURL);
             console.log('got cache', imgURL);
         } else {
             console.log('caching', url);
-            self.cacheImage(url);
+            self.cacheImage(url, imgElement);
         }
     };
     request.onerror = function(event) {
@@ -155,7 +156,7 @@ Yolo.onzoom = function() {
         .scale(self.zoom.scale())
         .translate(self.zoom.translate())
         ();
-    
+
     self.projection
         .scale(self.zoom.scale() / 2 / Math.PI)
         .translate(self.zoom.translate());
@@ -170,9 +171,9 @@ Yolo.onzoom = function() {
     
     image.enter().append('image')
         .attr('xlink:href', function(d) {
-            var url = 'http://mt' + Math.round(Math.random() * 3) + '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
+            var url = '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
             self.setCachedImage(url, this);
-            return url;
+            return '';
         })
         .attr('width', 1)
         .attr('height', 1)
