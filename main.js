@@ -26,7 +26,7 @@ Yolo.init = function() {
         .translate([width - center[0], height - center[1]])
         .on('zoom', this.onzoom);
 
-    var svg = d3.select('#map')
+    var svg = d3.select('.map')
         .attr('width', width)
         .attr('height', height)
         .on('click', this.onclick)
