@@ -1,21 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html manifest="cache.manifest">
 <head>
     <title>Your Local Network Planner</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <link rel="stylesheet" href="static/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
     <div class="header">
         <div class="header_logo">YoloNP</div>
         <div class="header_status">Welcome!</div>
-        <div class="header_control">
-            Building
-        </div>
-        <div class="header_control">
-            Powerline
-        </div>
+        <div class="header_control">Building</div>
+        <div class="header_control">Powerline</div>
     </div>
     <div class="cursor_coordinates"></div>
     <div class="costs">
@@ -67,9 +63,8 @@
     </div>
     <svg id="map"></svg>
     
-    <script src="http://d3js.org/d3.v3.min.js"></script>
-    <script src="http://d3js.org/d3.geo.tile.v0.min.js"></script>
-    <script src="static/main.js"></script>
+    <script src="lib.js"></script>
+    <script src="main.js"></script>
     <script>
         Yolo.initTileCache();
         setTimeout(function(){ Yolo.init(); }, 1000);
