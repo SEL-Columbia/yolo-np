@@ -1,4 +1,5 @@
 Yolo = {
+    tileCache: false,
     mode: null,
     currentNode: null,
     points: []
@@ -8,6 +9,8 @@ Yolo.init = function() {
     this.width = window.innerWidth;
     this.height = window.innerHeight;
 
+    this.initTileCache();
+    
     this.tile = d3.geo.tile()
         .size([this.width, this.height]);
 
@@ -57,68 +60,142 @@ Yolo.setCenter = function(position) {
 };
 
 Yolo.initTileCache = function() {
-    var request = window.indexedDB.open('tileCache', 5);
     var self = this;
 
-    request.onerror = function(event) {
-        console.log("Error creating/accessing IndexedDB database");
-    };
+    // FileSystem API
+    // http://www.html5rocks.com/en/tutorials/file/filesystem/
+    // It's faster than IndexedDB, but is deprecated
+    if (window.requestFileSystem || window.webkitRequestFileSystem) {
+        window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
 
-    request.onsuccess = function(event) {
-        console.log("Success creating/accessing IndexedDB database");
-        self.db = request.result;
-        self.db.onerror = function(event) {
+        function init(fs) {
+            self.fs_cache = fs;
+            self.tileCache = true;
+        }
+
+        function fileErrorHandler(e) {
+            console.log(e)
+        }
+
+        window.requestFileSystem(
+            window.TEMPORARY, 20*1024*1024, init, fileErrorHandler);
+
+    // IndexedDB
+    // http://www.html5rocks.com/en/tutorials/indexeddb/todo/
+    // Blob support was just added in Chrome Canary (as of July 2014)
+    } else if (window.indexedDB) {
+        var request = window.indexedDB.open('tileCache', 5);
+
+        request.onerror = function(event) {
             console.log("Error creating/accessing IndexedDB database");
         };
-        //self.db.getObjectStore('tiles').clear();
-    };
 
-    request.onupgradeneeded = function(event) {
-        self.db = event.target.result;
-        self.db.createObjectStore('tiles');
-    };
+        request.onsuccess = function(event) {
+            console.log("Success creating/accessing IndexedDB database");
+            self.tileCache = true;            
+            self.idb_cache = request.result;
+            self.idb_cache.onerror = function(event) {
+                console.log("Error creating/accessing IndexedDB database");
+            };
+            //self.db.getObjectStore('tiles').clear();
+        };
+
+        request.onupgradeneeded = function(event) {
+            self.idb_cache = event.target.result;
+            self.idb_cache.createObjectStore('tiles');
+        };
+    }
 };
 
-Yolo.cacheImage = function(url, imgElement) {
+Yolo.getCachedImage = function(url, imgElement) {
+    var self = this;
+    // Remove subdomain from tile image url
+    var imgKey = url.split('.').slice(1).join('.');
+    var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
+
+    if (self.fs_cache) {
+        self.fs_cache.root.getFile(imgKey, {}, function(fileEntry) {
+            fileEntry.file(function(imgFile) {
+                var URL = window.URL || window.webkitURL;
+                var imgURL = URL.createObjectURL(imgFile);
+                if (imgElement) {
+                    imgElement.setAttribute('href', imgURL);
+                }
+            });
+        }, function onerror(e) {
+            if (e.NOT_FOUND_ERR) {
+                self.fetchImage(url, imgElement);
+            }
+        });
+    } else if (self.idb_cache) {
+        var store = self.idb_cache
+            .transaction(['tiles'], 'readwrite')
+            .objectStore('tiles');
+        var request = store.get(imgKey);
+
+        request.onsuccess = function(event) {
+            var imgFile = event.target.result;
+            if (imgFile) {
+                var URL = window.URL || window.webkitURL;
+                var imgURL = URL.createObjectURL(imgFile);
+                if (imgElement) {
+                    imgElement.setAttribute('href', imgURL);
+                }
+            } else {
+                self.fetchImage(url, imgElement);
+            }
+        };
+        request.onerror = function(event) {
+            console.log('error');
+        };
+    }
+};
+
+Yolo.fetchImage = function(url, imgElement) {
     var self = this;
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'http://mt' + Math.round(Math.random() * 3) + url, true);
+    xhr.open('GET', url, true);
     xhr.responseType = 'blob';
     xhr.addEventListener('load', function() {
         if (xhr.status === 200) {
-            self.db
-                .transaction(['tiles'], 'readwrite')
-                .objectStore('tiles')
-                .put(xhr.response, url);
-            self.setCachedImage(url, imgElement);
+            self.saveCachedImage(url, xhr.response, imgElement);
         }
     }, false);
     xhr.send();
 };
 
-Yolo.setCachedImage = function(url, imgElement) {
+Yolo.saveCachedImage = function(url, imgBlob, imgElement) {
     var self = this;
-    var store = self.db
-        .transaction(['tiles'], 'readwrite')
-        .objectStore('tiles');
-    var request = store.get(url);
+    var imgKey = url.split('.').slice(1).join('.');
+    var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
 
-    request.onsuccess = function(event) {
-        var imgFile = event.target.result;
-        if (imgFile) {
-            var URL = window.URL || window.webkitURL;
-            var imgURL = URL.createObjectURL(imgFile);
-            imgElement.setAttribute('href', imgURL);
-            //console.log('got cache', imgURL);
-        } else {
-            //console.log('caching', url);
-            self.cacheImage(url, imgElement);
+    if (self.fs_cache) {
+        function fileErrorHandler(e) {
+            console.log(imgKey, e);
         }
-    };
-    request.onerror = function(event) {
-        console.log('error');
-    };
+        self.fs_cache.root.getFile(imgKey, {create: true}, function(fileEntry) {
+            fileEntry.createWriter(function(fileWriter){
+                fileWriter.onwriteend = function(e) {
+                    console.log('Write completed.');
+                    self.getCachedImage(url, imgElement);
+                };
+
+                fileWriter.onerror = function(e) {
+                    console.log('Write failed: ' + e.toString());
+                };
+                fileWriter.write(imgBlob);
+                self.getCachedImage(url, imgElement);
+            }, fileErrorHandler);
+        }, fileErrorHandler);
+    } else if (self.idb_cache) {
+        self.idb_cache
+            .transaction(['tiles'], 'readwrite')
+            .objectStore('tiles')
+            .put(xhr.response, imgKey);
+        self.getCachedImage(url, imgElement);
+    }
 };
+
 
 Yolo.setStatus = function(status) {
     d3.select('.header_status')
@@ -182,9 +259,14 @@ Yolo.onzoom = function() {
     
     image.enter().append('image')
         .attr('xlink:href', function(d) {
-            var url = '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
-            self.setCachedImage(url, this);
-            return '';
+            var url = 'http://mt' + Math.round(Math.random() * 3) +
+                '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
+            if (self.tileCache) {
+                self.getCachedImage(url, this);
+                return '';
+            } else {
+                return url;
+            }
         })
         .attr('width', 1)
         .attr('height', 1)
