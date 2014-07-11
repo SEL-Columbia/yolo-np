@@ -5,43 +5,7 @@ Yolo = {
 };
 
 Yolo.init = function() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
 
-    this.tile = d3.geo.tile()
-        .size([this.width, this.height]);
-
-    this.projection = d3.geo.mercator()
-        .center([40.809657, -73.960076])
-        .scale((1 << 12) / 2 / Math.PI)
-        .translate([this.width / 2, this.height / 2]);
-
-    this.path = d3.geo.path()
-        .projection(this.projection);
-
-    this.zoom = d3.behavior.zoom()
-        .translate(this.projection.translate())
-        .scale(this.projection.scale() * 4 * Math.PI)
-        .scaleExtent([1 << 11, 1 << 28])
-        .on('zoom', this.onzoom);
-
-    var svg = d3.select('.map')
-        .attr('width', this.width)
-        .attr('height', this.height)
-        .on('click', this.onclick)
-        .call(this.zoom)
-        .on('dblclick.zoom', null);
-
-    this.raster = svg.append('g');
-    this.vector = svg.append('g');
-
-    d3.select('body')
-        .on('mousemove', this.mousemove)
-        .on('keydown', this.keydown);
-
-    this.onzoom();
-
-    //navigator.geolocation.getCurrentPosition(this.setCenter);
 };
 
 
