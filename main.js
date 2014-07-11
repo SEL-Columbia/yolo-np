@@ -261,6 +261,7 @@ Yolo.onzoom = function() {
         .attr('xlink:href', function(d) {
             var url = 'http://mt' + Math.round(Math.random() * 3) +
                 '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
+            return url;
             if (self.tileCache) {
                 self.getCachedImage(url, this);
                 return '';
