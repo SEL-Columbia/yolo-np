@@ -48,6 +48,28 @@ Yolo.init = function() {
 };
 
 
+Yolo.init = function() {
+    var self = this;
+
+    this.initTileCache();
+    
+    var funcLayer = new L.TileLayer.Functional(function(view) {
+        var deferred = $.Deferred();
+        var url = 'http://mt' + Math.round(Math.random() * 3) + 
+            '.google.com/vt/lyrs=y&x={y}&y={x}&z={z}'
+            .replace('{z}', view.zoom)
+            .replace('{x}', view.tile.row)
+            .replace('{y}', view.tile.column);
+        self.getCachedImage(url, deferred.resolve);
+        return deferred.promise();
+    });
+
+    var map = new L.Map('map', { center: new L.LatLng(42.3584308, -71.0597732), zoom: 15, layers: [funcLayer] });
+
+    map.locate({setView: true, maxZoom: 16});
+};
+
+
 Yolo.setCenter = function(position) {
     var self = Yolo;
     var coords = position.coords;
@@ -107,10 +129,14 @@ Yolo.initTileCache = function() {
     }
 };
 
-Yolo.getCachedImage = function(url, imgElement) {
+Yolo.getCachedImage = function(url, cb) {
     var self = this;
+
+    if (!self.tileCache) {
+        return cb(url);
+    }
+
     // Remove subdomain from tile image url
-    var imgKey = url.split('.').slice(1).join('.');
     var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
 
     if (self.fs_cache) {
@@ -118,13 +144,11 @@ Yolo.getCachedImage = function(url, imgElement) {
             fileEntry.file(function(imgFile) {
                 var URL = window.URL || window.webkitURL;
                 var imgURL = URL.createObjectURL(imgFile);
-                if (imgElement) {
-                    imgElement.setAttribute('href', imgURL);
-                }
+                cb(imgURL);
             });
         }, function onerror(e) {
             if (e.NOT_FOUND_ERR) {
-                self.fetchImage(url, imgElement);
+                self.fetchImage(url, cb);
             }
         });
     } else if (self.idb_cache) {
@@ -138,11 +162,9 @@ Yolo.getCachedImage = function(url, imgElement) {
             if (imgFile) {
                 var URL = window.URL || window.webkitURL;
                 var imgURL = URL.createObjectURL(imgFile);
-                if (imgElement) {
-                    imgElement.setAttribute('href', imgURL);
-                }
+                cb(imgURL);
             } else {
-                self.fetchImage(url, imgElement);
+                self.fetchImage(url, cb);
             }
         };
         request.onerror = function(event) {
@@ -151,22 +173,21 @@ Yolo.getCachedImage = function(url, imgElement) {
     }
 };
 
-Yolo.fetchImage = function(url, imgElement) {
+Yolo.fetchImage = function(url, cb) {
     var self = this;
     var xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.responseType = 'blob';
     xhr.addEventListener('load', function() {
         if (xhr.status === 200) {
-            self.saveCachedImage(url, xhr.response, imgElement);
+            self.saveCachedImage(url, xhr.response, cb);
         }
     }, false);
     xhr.send();
 };
 
-Yolo.saveCachedImage = function(url, imgBlob, imgElement) {
+Yolo.saveCachedImage = function(url, imgBlob, cb) {
     var self = this;
-    var imgKey = url.split('.').slice(1).join('.');
     var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
 
     if (self.fs_cache) {
@@ -177,14 +198,14 @@ Yolo.saveCachedImage = function(url, imgBlob, imgElement) {
             fileEntry.createWriter(function(fileWriter){
                 fileWriter.onwriteend = function(e) {
                     console.log('Write completed.');
-                    self.getCachedImage(url, imgElement);
+                    self.getCachedImage(url, cb);
                 };
 
                 fileWriter.onerror = function(e) {
                     console.log('Write failed: ' + e.toString());
                 };
                 fileWriter.write(imgBlob);
-                self.getCachedImage(url, imgElement);
+                self.getCachedImage(url, cb);
             }, fileErrorHandler);
         }, fileErrorHandler);
     } else if (self.idb_cache) {
@@ -192,7 +213,7 @@ Yolo.saveCachedImage = function(url, imgBlob, imgElement) {
             .transaction(['tiles'], 'readwrite')
             .objectStore('tiles')
             .put(xhr.response, imgKey);
-        self.getCachedImage(url, imgElement);
+        self.getCachedImage(url, cb);
     }
 };
 
