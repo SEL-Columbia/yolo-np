@@ -5,30 +5,29 @@ Yolo = {
 };
 
 Yolo.init = function() {
-    var width = window.innerWidth,
-        height = window.innerHeight;
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
 
     this.tile = d3.geo.tile()
-        .size([width, height]);
+        .size([this.width, this.height]);
 
     this.projection = d3.geo.mercator()
+        .center([40.809657, -73.960076])
         .scale((1 << 12) / 2 / Math.PI)
-        .translate([width / 2, height / 2]);
+        .translate([this.width / 2, this.height / 2]);
 
     this.path = d3.geo.path()
         .projection(this.projection);
 
-    var center = this.projection([-5.77599353, 13.61105531]);
-
     this.zoom = d3.behavior.zoom()
-        .scale(this.projection.scale() * 2 * Math.PI)
+        .translate(this.projection.translate())
+        .scale(this.projection.scale() * 4 * Math.PI)
         .scaleExtent([1 << 11, 1 << 28])
-        .translate([width - center[0], height - center[1]])
         .on('zoom', this.onzoom);
 
     var svg = d3.select('.map')
-        .attr('width', width)
-        .attr('height', height)
+        .attr('width', this.width)
+        .attr('height', this.height)
         .on('click', this.onclick)
         .call(this.zoom)
         .on('dblclick.zoom', null);
@@ -41,8 +40,21 @@ Yolo.init = function() {
         .on('keydown', this.keydown);
 
     this.onzoom();
+
+    //navigator.geolocation.getCurrentPosition(this.setCenter);
 };
 
+
+Yolo.setCenter = function(position) {
+    var self = Yolo;
+    var coords = position.coords;
+    var center = self.projection([coords.longitude, coords.latitude]);
+
+    self.zoom
+        .translate([self.width - center[0], self.height - center[1]])
+        .scale(1 << 15);
+    self.onzoom();
+};
 
 Yolo.initTileCache = function() {
     var request = window.indexedDB.open('tileCache', 5);
@@ -97,9 +109,9 @@ Yolo.setCachedImage = function(url, imgElement) {
             var URL = window.URL || window.webkitURL;
             var imgURL = URL.createObjectURL(imgFile);
             imgElement.setAttribute('href', imgURL);
-            console.log('got cache', imgURL);
+            //console.log('got cache', imgURL);
         } else {
-            console.log('caching', url);
+            //console.log('caching', url);
             self.cacheImage(url, imgElement);
         }
     };
@@ -142,7 +154,6 @@ Yolo.keydown = function() {
 Yolo.onclick = function(d) {
     var self = Yolo;
     if (self.mode === 'point') {
-        console.log('yo')
         var coordinates = self.projection.invert(d3.mouse(this));
         self.currentNode = coordinates;
         self.points.push(coordinates);
