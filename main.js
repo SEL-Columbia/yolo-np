@@ -5,81 +5,68 @@ Yolo = {
     points: []
 };
 
-Yolo.init = function() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
-
-    this.initTileCache();
-    
-    this.tile = d3.geo.tile()
-        .size([this.width, this.height]);
-
-    this.projection = d3.geo.mercator()
-        .center([40.809657, -73.960076])
-        .scale((1 << 12) / 2 / Math.PI)
-        .translate([this.width / 2, this.height / 2]);
-
-    this.path = d3.geo.path()
-        .projection(this.projection);
-
-    this.zoom = d3.behavior.zoom()
-        .translate(this.projection.translate())
-        .scale(this.projection.scale() * 4 * Math.PI)
-        .scaleExtent([1 << 11, 1 << 28])
-        .on('zoom', this.onzoom);
-
-    var svg = d3.select('.map')
-        .attr('width', this.width)
-        .attr('height', this.height)
-        .on('click', this.onclick)
-        .call(this.zoom)
-        .on('dblclick.zoom', null);
-
-    this.raster = svg.append('g');
-    this.vector = svg.append('g');
-
-    d3.select('body')
-        .on('mousemove', this.mousemove)
-        .on('keydown', this.keydown);
-
-    this.onzoom();
-
-    //navigator.geolocation.getCurrentPosition(this.setCenter);
-};
-
 
 Yolo.init = function() {
     var self = this;
 
     this.initTileCache();
+
+    map = L.map('map', {
+            center: [40.809400, -73.960029],
+            zoom: 16,
+            zoomControl: false,
+            attributionControl: false
+        })
+        .on('click', function(e) {
+            L.circle(e.latlng, 4, {
+                    fill: true,
+                    fillColor: 'orange',
+                    opacity: 1
+                })
+                .addTo(map); 
+        });
     
     var funcLayer = new L.TileLayer.Functional(function(view) {
         var deferred = $.Deferred();
         var url = 'http://mt' + Math.round(Math.random() * 3) + 
             '.google.com/vt/lyrs=y&x={y}&y={x}&z={z}'
-            .replace('{z}', view.zoom)
+            .replace('{z}', Math.floor(view.zoom))
             .replace('{x}', view.tile.row)
             .replace('{y}', view.tile.column);
         self.getCachedImage(url, deferred.resolve);
         return deferred.promise();
     });
 
-    var map = new L.Map('map', { center: new L.LatLng(42.3584308, -71.0597732), zoom: 15, layers: [funcLayer] });
+    map.addLayer(funcLayer)
+        .locate({
+            setView: true,
+            maxZoom: 20,
+            enableHighAccuracy: true
+        });
 
-    map.locate({setView: true, maxZoom: 16});
+    $('.control_zoom').click(function() {
+            console.log('click')
+        })
+        .mousedown(function(e) {
+            var mid = e.pageY;
+            var step = (window.innerHeight - e.pageY) / 10;
+            var center = map.getCenter();
+            console.log('mousedown', e.pageY)
+            $(document.body)
+                .on('mousemove.zoom', function(e) {
+                    var i = Math.floor((mid - e.pageY) / step);
+                    if (i !== 0) {
+                        console.log(i)
+                        map.setView(center, map.getZoom() + i);
+                    }
+                })
+                .one('mouseup', function() {
+                    console.log('moseup')
+                    $(document.body).off('mousemove.zoom');
+                });
+        });
 };
 
-
-Yolo.setCenter = function(position) {
-    var self = Yolo;
-    var coords = position.coords;
-    var center = self.projection([coords.longitude, coords.latitude]);
-
-    self.zoom
-        .translate([self.width - center[0], self.height - center[1]])
-        .scale(1 << 15);
-    self.onzoom();
-};
 
 Yolo.initTileCache = function() {
     var self = this;
@@ -132,9 +119,7 @@ Yolo.initTileCache = function() {
 Yolo.getCachedImage = function(url, cb) {
     var self = this;
 
-    if (!self.tileCache) {
-        return cb(url);
-    }
+    if (!self.tileCache) return cb(url);
 
     // Remove subdomain from tile image url
     var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
@@ -197,7 +182,6 @@ Yolo.saveCachedImage = function(url, imgBlob, cb) {
         self.fs_cache.root.getFile(imgKey, {create: true}, function(fileEntry) {
             fileEntry.createWriter(function(fileWriter){
                 fileWriter.onwriteend = function(e) {
-                    console.log('Write completed.');
                     self.getCachedImage(url, cb);
                 };
 
@@ -212,7 +196,7 @@ Yolo.saveCachedImage = function(url, imgBlob, cb) {
         self.idb_cache
             .transaction(['tiles'], 'readwrite')
             .objectStore('tiles')
-            .put(xhr.response, imgKey);
+            .put(imgBlob, imgKey);
         self.getCachedImage(url, cb);
     }
 };
@@ -223,11 +207,9 @@ Yolo.setStatus = function(status) {
         .html(status);
 };
 
-Yolo.keydown = function() {
+Yolo.keydown = function(e) {
     var self = Yolo;
-    var key = d3.event.keyCode;
-    console.log(key);
-    if (key === 27) {
+    if (e.keyCode === 27) {
         // Escape
         self.mode = null;
         self.currentNode = null;
@@ -237,11 +219,11 @@ Yolo.keydown = function() {
             .remove();
         d3.selectAll('.costs')
             .attr('style', 'display:none');
-    } else if (key === 80) {
+    } else if (e.keyCode === 80) {
         // p, for point
         self.mode = 'point';
         self.setStatus('Point mode');
-    } else if (key === 67) {
+    } else if (e.keyCode === 67) {
         // c, for costs
         self.getCosts();
         d3.select('.costs')
@@ -249,125 +231,7 @@ Yolo.keydown = function() {
     }
 };
 
-Yolo.onclick = function(d) {
-    var self = Yolo;
-    if (self.mode === 'point') {
-        var coordinates = self.projection.invert(d3.mouse(this));
-        self.currentNode = coordinates;
-        self.points.push(coordinates);
-        self.drawPoints();
-    }
-};
 
-Yolo.onzoom = function() {
-    var self = Yolo;
-    var tiles = self.tile
-        .scale(self.zoom.scale())
-        .translate(self.zoom.translate())
-        ();
-
-    self.projection
-        .scale(self.zoom.scale() / 2 / Math.PI)
-        .translate(self.zoom.translate());
-
-    var image = self.raster
-        .attr('transform', 'scale(' + tiles.scale + ')translate(' + tiles.translate + ')')
-        .selectAll('image')
-        .data(tiles, function(d) { return d; });
-    
-    image.exit()
-        .remove();
-    
-    image.enter().append('image')
-        .attr('xlink:href', function(d) {
-            var url = 'http://mt' + Math.round(Math.random() * 3) +
-                '.google.com/vt/lyrs=y&x=' + d[0] + '&y=' + d[1] + '&z=' + d[2];
-            if (self.tileCache) {
-                self.getCachedImage(url, this);
-                return '';
-            } else {
-                return url;
-            }
-        })
-        .attr('width', 1)
-        .attr('height', 1)
-        .attr('x', function(d) { return d[0]; })
-        .attr('y', function(d) { return d[1]; });
-
-    // Reproject vector layer
-    self.vector.selectAll('circle')
-        .attr('cx', function(d) { return self.projection(d)[0]; })
-        .attr('cy', function(d) { return self.projection(d)[1]; });
-    
-    self.vector.selectAll('path')
-        .attr('d', self.path);
-};
-
-Yolo.mousemove = function() {
-    var self = Yolo;
-    var coord = self.projection.invert(d3.mouse(this));
-
-    d3.select('.cursor_coordinates')
-        .html(coord[0].toFixed(4) + ', ' + coord[1].toFixed(4));
-
-    if (self.mode === 'point') {
-        self.vector
-            .selectAll('.cursor')
-            .remove();
-
-        if (self.currentNode) {
-            self.vector.append('path')
-                .datum({
-                    type: 'Feature',
-                    geometry: {
-                        type: 'LineString',
-                        coordinates: [self.currentNode, coord]
-                    }
-                })
-                .attr('d', self.path)
-                .attr('class', 'cursor edge');
-        }
-
-        self.vector.append('circle')
-            .datum(coord)
-            .attr('cx', function(d) { return self.projection(d)[0]; })
-            .attr('cy', function(d) { return self.projection(d)[1]; })
-            .attr('r', 5)
-            .attr('class', 'cursor node');
-    }
-};
-
-Yolo.drawPoints = function() {
-    var self = this;
-
-    // Draw lines
-    self.vector
-        .append('path')
-        .datum({
-            type: 'Feature',
-            geometry: {
-                type: 'LineString',
-                coordinates: self.points
-            }
-        })
-        .attr('d', self.path)
-        .attr('class', 'edge');
-
-    // Draw nodes
-    self.vector
-        .selectAll('.node')
-        .remove();
-
-    self.vector
-        .selectAll('.node')
-        .data(self.points)
-        .enter()
-        .append('circle')
-        .attr('cx', function(d) { return self.projection(d)[0]; })
-        .attr('cy', function(d) { return self.projection(d)[1]; })
-        .attr('r', 5)
-        .attr('class', 'node');
-};
 
 Yolo.getCosts = function() {
     var dist = 0;
