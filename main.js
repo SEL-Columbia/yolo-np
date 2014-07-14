@@ -1,31 +1,43 @@
+// https://github.com/zetter/voronoi-maps/blob/master/lib/voronoi_map.js
+// http://chriszetter.com/voronoi-map/examples/uk-supermarkets/
+// https://github.com/mbostock/bost.ocks.org/blob/gh-pages/mike/leaflet/index.html#L131-171
+
+
 Yolo = {
     tileCache: false,
     mode: null,
     currentNode: null,
-    points: []
+    points: [],
+    map: null,
+    vector: null
 };
 
 
 Yolo.init = function() {
     var self = this;
 
-    this.initTileCache();
+    self.initTileCache();
 
-    map = L.map('map', {
+    self.map = L.map('map', {
             center: [40.809400, -73.960029],
             zoom: 16,
             zoomControl: false,
             attributionControl: false
         })
-        .on('click', function(e) {
-            L.circle(e.latlng, 4, {
-                    fill: true,
-                    fillColor: 'orange',
-                    opacity: 1
-                })
-                .addTo(map); 
-        });
+        .on('click', self.onclick)
+        .on('viewreset', self.onreset)
+        .on('moveend', self.onreset);
     
+    // Add vector layer
+    var size = self.map.getSize();
+    self.vector = d3.select(self.map.getPanes().overlayPane)
+        .append('svg')
+        .attr('width', size.x + 'px')
+        .attr('height', size.y + 'px')
+        .append('g')
+        .attr('class', 'leaflet-zoom-hide');
+
+    // Tile layer
     var funcLayer = new L.TileLayer.Functional(function(view) {
         var deferred = $.Deferred();
         var url = 'http://mt' + Math.round(Math.random() * 3) + 
@@ -37,7 +49,7 @@ Yolo.init = function() {
         return deferred.promise();
     });
 
-    map.addLayer(funcLayer)
+    self.map.addLayer(funcLayer)
         .locate({
             setView: true,
             maxZoom: 20,
@@ -185,30 +197,58 @@ Yolo.setStatus = function(status) {
         .html(status);
 };
 
-Yolo.keydown = function(e) {
+Yolo.onclick = function(e) {
     var self = Yolo;
-    if (e.keyCode === 27) {
-        // Escape
-        self.mode = null;
-        self.currentNode = null;
-        self.setStatus('');
+    var point = e.layerPoint;
+    self.vector
+        .append('svg:circle')
+        .datum(e.latlng)
+        .attr('r', 5)
+        .attr('class', 'node');
+
+    // Draw line from currentNode
+    if (self.currentNode) {
         self.vector
-            .selectAll('.cursor')
-            .remove();
-        d3.selectAll('.costs')
-            .attr('style', 'display:none');
-    } else if (e.keyCode === 80) {
-        // p, for point
-        self.mode = 'point';
-        self.setStatus('Point mode');
-    } else if (e.keyCode === 67) {
-        // c, for costs
-        self.getCosts();
-        d3.select('.costs')
-            .attr('style', 'display:block');
+            .append('svg:line')
+            .datum([self.currentNode, e.latlng])
+            .attr('class', 'line');
     }
+    self.currentNode = e.latlng;
+    self.onreset();
 };
 
+Yolo.onreset = function() {
+    // Updates the vector layer on map move/zoom
+    var self = Yolo;
+
+    var bounds = self.map.getBounds();
+    var offset = self.map.latLngToLayerPoint(bounds.getNorthWest());
+
+    // Reverse .map-pane transform
+    d3.select('svg')
+        .attr('style', '-webkit-transform: translate3d(' + offset.x + 'px,' + offset.y + 'px, 0);');
+
+    // Reposition circles
+    self.vector
+        .selectAll('circle')
+        .each(function(d) {
+            var point = self.map.latLngToLayerPoint(d);
+            this.setAttribute('cx', point.x - offset.x);
+            this.setAttribute('cy', point.y - offset.y);
+        });
+
+    // Reposition lines
+    self.vector
+        .selectAll('line')
+        .each(function(d) {
+            var p1 = self.map.latLngToLayerPoint(d[0]);
+            var p2 = self.map.latLngToLayerPoint(d[1]);
+            this.setAttribute('x1', p1.x - offset.x);
+            this.setAttribute('y1', p1.y - offset.y);
+            this.setAttribute('x2', p2.x - offset.x);
+            this.setAttribute('y2', p2.y - offset.y);
+        });
+};
 
 
 Yolo.getCosts = function() {
