@@ -28,6 +28,11 @@ h1 {
     fill: darkred;
 }
 
+.pole {
+    cursor: pointer;
+    fill: blue;
+}
+
 .line {
     fill: none;
     stroke: purple;

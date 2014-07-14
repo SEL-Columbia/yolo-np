@@ -200,19 +200,33 @@ Yolo.setStatus = function(status) {
 Yolo.onclick = function(e) {
     var self = Yolo;
     var point = e.layerPoint;
+
+    // Draw line & poles
+    if (self.currentNode) {
+        self.vector
+            .append('svg:line')
+            .datum([self.currentNode, e.latlng])
+            .attr('class', 'line');
+
+        // Add power poles
+        var poles = self.generatePoints(self.currentNode, e.latlng, 100);
+        self.vector
+            .selectAll()
+            .data(poles)
+            .enter()
+            .append('svg:circle')            
+            .attr('r', 5)
+            .attr('class', 'pole');
+
+    }
+
+    // Draw point
     self.vector
         .append('svg:circle')
         .datum(e.latlng)
         .attr('r', 5)
         .attr('class', 'node');
 
-    // Draw line from currentNode
-    if (self.currentNode) {
-        self.vector
-            .append('svg:line')
-            .datum([self.currentNode, e.latlng])
-            .attr('class', 'line');
-    }
     self.currentNode = e.latlng;
     self.onreset();
 };
@@ -270,7 +284,6 @@ Yolo.getCosts = function() {
 Yolo.generatePoints = function(pointA, pointB, interval){
     // Returns a list of points between A and B at intervals of X meters
     var self = this;
-    interval = interval || 100;
     var points = [];
     var dist = self.distBetweenPoints(pointA.lat, pointA.lng, pointB.lat, pointB.lng) * 1000;
     var nSplits = Math.floor(dist / interval);
