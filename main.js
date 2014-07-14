@@ -43,28 +43,6 @@ Yolo.init = function() {
             maxZoom: 20,
             enableHighAccuracy: true
         });
-
-    $('.control_zoom').click(function() {
-            console.log('click')
-        })
-        .mousedown(function(e) {
-            var mid = e.pageY;
-            var step = (window.innerHeight - e.pageY) / 10;
-            var center = map.getCenter();
-            console.log('mousedown', e.pageY)
-            $(document.body)
-                .on('mousemove.zoom', function(e) {
-                    var i = Math.floor((mid - e.pageY) / step);
-                    if (i !== 0) {
-                        console.log(i)
-                        map.setView(center, map.getZoom() + i);
-                    }
-                })
-                .one('mouseup', function() {
-                    console.log('moseup')
-                    $(document.body).off('mousemove.zoom');
-                });
-        });
 };
 
 
