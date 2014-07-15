@@ -6,8 +6,9 @@
 Yolo = {
     tileCache: false,
     mode: null,
-    currentNode: null,
-    points: [],
+    selected: null,
+    nodes: [],
+    lines: [],
     map: null,
     vector: null
 };
@@ -22,20 +23,12 @@ Yolo.init = function() {
             center: [40.809400, -73.960029],
             zoom: 16,
             zoomControl: false,
+            doubleClickZoom: false,
             attributionControl: false
         })
-        .on('click', self.onclick)
-        .on('viewreset', self.onreset)
-        .on('moveend', self.onreset);
-    
-    // Add vector layer
-    var size = self.map.getSize();
-    self.vector = d3.select(self.map.getPanes().overlayPane)
-        .append('svg')
-        .attr('width', size.x + 'px')
-        .attr('height', size.y + 'px')
-        .append('g')
-        .attr('class', 'leaflet-zoom-hide');
+        .on('click', self.onmapclick)
+        .on('viewreset', self.updatevectors)
+        .on('moveend', self.updatevectors);
 
     // Tile layer
     var funcLayer = new L.TileLayer.Functional(function(view) {
@@ -45,7 +38,7 @@ Yolo.init = function() {
             .replace('{z}', Math.floor(view.zoom))
             .replace('{x}', view.tile.row)
             .replace('{y}', view.tile.column);
-        self.getCachedImage(url, deferred.resolve);
+        self.getImage(url, deferred.resolve);
         return deferred.promise();
     });
 
@@ -55,6 +48,17 @@ Yolo.init = function() {
             maxZoom: 20,
             enableHighAccuracy: true
         });
+
+    // Add vector layer
+    self.vector = d3.select(self.map.getPanes().overlayPane)
+        .append('svg')
+        .append('g')
+        .attr('class', 'leaflet-zoom-hide')
+        .on('click', self.onvectorclick, true)
+        .on('mouseover', self.onmouseover, true)
+        .on('mouseout', self.onmouseover, true);
+
+    self.load();
 };
 
 
@@ -106,7 +110,8 @@ Yolo.initTileCache = function() {
     }
 };
 
-Yolo.getCachedImage = function(url, cb) {
+Yolo.getImage = function(url, cb) {
+    // Retrieves an image from cache, possibly fetching it first
     var self = this;
 
     if (!self.tileCache) return cb(url);
@@ -155,13 +160,13 @@ Yolo.fetchImage = function(url, cb) {
     xhr.responseType = 'blob';
     xhr.addEventListener('load', function() {
         if (xhr.status === 200) {
-            self.saveCachedImage(url, xhr.response, cb);
+            self.saveImage(url, xhr.response, cb);
         }
     }, false);
     xhr.send();
 };
 
-Yolo.saveCachedImage = function(url, imgBlob, cb) {
+Yolo.saveImage = function(url, imgBlob, cb) {
     var self = this;
     var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
 
@@ -172,14 +177,14 @@ Yolo.saveCachedImage = function(url, imgBlob, cb) {
         self.fs_cache.root.getFile(imgKey, {create: true}, function(fileEntry) {
             fileEntry.createWriter(function(fileWriter){
                 fileWriter.onwriteend = function(e) {
-                    self.getCachedImage(url, cb);
+                    self.getImage(url, cb);
                 };
 
                 fileWriter.onerror = function(e) {
                     console.log('Write failed: ' + e.toString());
                 };
                 fileWriter.write(imgBlob);
-                self.getCachedImage(url, cb);
+                self.getImage(url, cb);
             }, fileErrorHandler);
         }, fileErrorHandler);
     } else if (self.idb_cache) {
@@ -187,59 +192,38 @@ Yolo.saveCachedImage = function(url, imgBlob, cb) {
             .transaction(['tiles'], 'readwrite')
             .objectStore('tiles')
             .put(imgBlob, imgKey);
-        self.getCachedImage(url, cb);
+        self.getImage(url, cb);
     }
 };
 
 
-Yolo.setStatus = function(status) {
+Yolo.status = function(status) {
     d3.select('.header_status')
         .html(status);
 };
 
-Yolo.onclick = function(e) {
-    var self = Yolo;
-    var point = e.layerPoint;
 
-    // Draw line & poles
-    if (self.currentNode) {
-        self.vector
-            .append('svg:line')
-            .datum([self.currentNode, e.latlng])
-            .attr('class', 'line');
-
-        // Add power poles
-        var poles = self.generatePoints(self.currentNode, e.latlng, 100);
-        self.vector
-            .selectAll()
-            .data(poles)
-            .enter()
-            .append('svg:circle')            
-            .attr('r', 5)
-            .attr('class', 'pole');
-
-    }
-
-    // Draw point
-    self.vector
-        .append('svg:circle')
-        .datum(e.latlng)
-        .attr('r', 5)
-        .attr('class', 'node');
-
-    self.currentNode = e.latlng;
-    self.onreset();
+Yolo.save = function() {
+    localStorage['nodes'] = JSON.stringify(this.nodes);
+    localStorage['lines'] = JSON.stringify(this.lines);
 };
 
-Yolo.onreset = function() {
+Yolo.load = function() {
+    this.nodes = JSON.parse(localStorage['nodes'] || '[]');
+    this.lines = JSON.parse(localStorage['lines'] || '[]');
+};
+
+Yolo.updatevectors = function() {
     // Updates the vector layer on map move/zoom
     var self = Yolo;
-
+    var size = self.map.getSize();
     var bounds = self.map.getBounds();
     var offset = self.map.latLngToLayerPoint(bounds.getNorthWest());
 
-    // Reverse .map-pane transform
+    // Set size & reverse .map-pane transform
     d3.select('svg')
+        .attr('width', size.x + 'px')
+        .attr('height', size.y + 'px')
         .attr('style', '-webkit-transform: translate3d(' + offset.x + 'px,' + offset.y + 'px, 0);');
 
     // Reposition circles
@@ -264,13 +248,66 @@ Yolo.onreset = function() {
         });
 };
 
+Yolo.onmapclick = function(e) {
+    // Leaflet event
+    var self = Yolo;
+    var point = e.layerPoint;
 
-Yolo.getCosts = function() {
+    // Draw line & poles
+    if (self.currentNode) {
+        self.vector
+            .append('svg:line')
+            .datum([self.currentNode, e.latlng])
+            .attr('class', 'line');
+
+        // Add power poles
+        var poles = self.intervals(self.currentNode, e.latlng, 100);
+        self.vector
+            .selectAll()
+            .data(poles)
+            .enter()
+            .append('svg:circle')            
+            .attr('r', 8)
+            .attr('class', 'pole');
+    }
+
+    // Draw point
+    self.vector
+        .append('svg:circle')
+        .datum(e.latlng)
+        .attr('r', 5)
+        .attr('class', 'node');
+
+    self.currentNode = e.latlng;
+    self.updatevectors();
+};
+
+Yolo.onvectorclick = function() {
+    var self = Yolo;
+    self.selected = d3.event.toElement;
+    console.log('click', d3.event.toElement);
+    e.preventDefault();
+};
+
+Yolo.onmouseover = function() {
+    var element = d3.event.toElement;
+    //console.log('mouseover', element.className)
+    if (element.classList.contains('node') || element.classList.contains('line')) {
+        //element.classList.push('');
+    }
+};
+
+Yolo.onmouseout = function(){
+    //console.log('mouseout', d3.event);
+
+};
+
+Yolo.costs = function() {
     var dist = 0;
     for (var i=0, pointA; pointA = this.points[i]; i++) {
         var pointB = this.points[i + 1];
         if (pointB){
-            dist += this.distBetweenPoints(pointA[1], pointA[0], pointB[1], pointB[0]);
+            dist += this.dist(pointA[1], pointA[0], pointB[1], pointB[0]);
         }
     }
     return {
@@ -281,11 +318,11 @@ Yolo.getCosts = function() {
 };
 
 
-Yolo.generatePoints = function(pointA, pointB, interval){
+Yolo.intervals = function(pointA, pointB, interval){
     // Returns a list of points between A and B at intervals of X meters
     var self = this;
     var points = [];
-    var dist = self.distBetweenPoints(pointA.lat, pointA.lng, pointB.lat, pointB.lng) * 1000;
+    var dist = self.dist(pointA.lat, pointA.lng, pointB.lat, pointB.lng) * 1000;
     var nSplits = Math.floor(dist / interval);
     var splitLat = (pointB.lat - pointA.lat) / nSplits;
     var splitLon = (pointB.lng - pointA.lng) / nSplits;
@@ -295,23 +332,23 @@ Yolo.generatePoints = function(pointA, pointB, interval){
     return points;
 };
 
-Yolo.distBetweenPoints = function(latA, lonA, latB, lonB){
+Yolo.dist = function(latA, lonA, latB, lonB){
     // http://stackoverflow.com/questions/27928/how-do-i-calculate-distance-between-two-latitude-longitude-points
     var R = 6371; // Radius of the earth in km    
-    var dLat = this.degToRad(latB - latA);
-    var dLon = this.degToRad(lonB - lonA); 
+    var dLat = this.deg2rad(latB - latA);
+    var dLon = this.deg2rad(lonB - lonA); 
     var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(this.degToRad(latA)) * Math.cos(this.degToRad(latB)) * 
+        Math.cos(this.deg2rad(latA)) * Math.cos(this.deg2rad(latB)) * 
         Math.sin(dLon/2) * Math.sin(dLon/2); 
     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
     return R * c; // Distance in km
 };
 
-Yolo.degToRad = function(deg){
+Yolo.deg2rad = function(deg){
     return deg * Math.PI / 180;
 };
 
-Yolo.radToDeg = function(rad){
+Yolo.rad2deg = function(rad){
     return rad * 180 / Math.PI;
 };
 
