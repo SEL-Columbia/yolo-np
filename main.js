@@ -249,6 +249,8 @@ Yolo.updatevectors = function() {
 };
 
 Yolo.onmapclick = function(e) {
+    console.log('map click', e);
+
     // Leaflet event
     var self = Yolo;
     var point = e.layerPoint;
@@ -283,10 +285,10 @@ Yolo.onmapclick = function(e) {
 };
 
 Yolo.onvectorclick = function() {
+    console.log('vector click', d3.event.toElement);
     var self = Yolo;
     self.selected = d3.event.toElement;
-    console.log('click', d3.event.toElement);
-    e.preventDefault();
+    d3.event.stopPropagation();
 };
 
 Yolo.onmouseover = function() {
