@@ -34,8 +34,8 @@ Yolo.init = function() {
             attributionControl: false
         })
         .on('click', self.onmapclick)
-        .on('viewreset', self.updatevectors)
-        .on('moveend', self.updatevectors);
+        .on('viewreset', self.updateVectors)
+        .on('moveend', self.updateVectors);
 
     // Tile layer
     var funcLayer = new L.TileLayer.Functional(function(view) {
@@ -226,41 +226,6 @@ Yolo.load = function() {
     this.lines = JSON.parse(localStorage['lines'] || '[]');
 };
 
-Yolo.updatevectors = function() {
-    // Updates the vector layer on map move/zoom
-    var self = Yolo;
-    var size = self.map.getSize();
-    var bounds = self.map.getBounds();
-    var offset = self.map.latLngToLayerPoint(bounds.getNorthWest());
-
-    // Set size & reverse .map-pane transform
-    d3.select('svg')
-        .attr('width', size.x + 'px')
-        .attr('height', size.y + 'px')
-        .attr('style', '-webkit-transform: translate3d(' + offset.x + 'px,' + offset.y + 'px, 0);');
-
-    // Reposition circles
-    self.vector
-        .selectAll('circle')
-        .each(function(d) {
-            var point = self.map.latLngToLayerPoint(d);
-            this.setAttribute('cx', point.x - offset.x);
-            this.setAttribute('cy', point.y - offset.y);
-        });
-
-    // Reposition lines
-    self.vector
-        .selectAll('line')
-        .each(function(d) {
-            var p1 = self.map.latLngToLayerPoint(d[0]);
-            var p2 = self.map.latLngToLayerPoint(d[1]);
-            this.setAttribute('x1', p1.x - offset.x);
-            this.setAttribute('y1', p1.y - offset.y);
-            this.setAttribute('x2', p2.x - offset.x);
-            this.setAttribute('y2', p2.y - offset.y);
-        });
-};
-
 
 Yolo.status = function(status) {
     d3.select('.header_status')
@@ -289,7 +254,7 @@ Yolo.onmapclick = function(e) {
     }
 
     self.selected = self.drawPoint(point);
-    self.updatevectors();
+    self.updateVectors();
     self.showControls();
 };
 
@@ -310,7 +275,7 @@ Yolo.onvectorclick = function() {
     }
 
     self.selected = d3.select(element);
-    self.updatevectors();
+    self.updateVectors();
     d3.event.stopPropagation();
 };
 
@@ -350,6 +315,41 @@ Yolo.drawLine = function(pointA, pointB) {
         .append('svg:circle')            
         .attr('r', 6)
         .attr('class', 'pole');
+};
+
+Yolo.updateVectors = function() {
+    // Updates the vector layer on map move/zoom
+    var self = Yolo;
+    var size = self.map.getSize();
+    var bounds = self.map.getBounds();
+    var offset = self.map.latLngToLayerPoint(bounds.getNorthWest());
+
+    // Set size & reverse .map-pane transform
+    d3.select('svg')
+        .attr('width', size.x + 'px')
+        .attr('height', size.y + 'px')
+        .attr('style', '-webkit-transform: translate3d(' + offset.x + 'px,' + offset.y + 'px, 0);');
+
+    // Reposition lines
+    self.vector
+        .selectAll('line')
+        .each(function(d) {
+            var p1 = self.map.latLngToLayerPoint(d[0]);
+            var p2 = self.map.latLngToLayerPoint(d[1]);
+            this.setAttribute('x1', p1.x - offset.x);
+            this.setAttribute('y1', p1.y - offset.y);
+            this.setAttribute('x2', p2.x - offset.x);
+            this.setAttribute('y2', p2.y - offset.y);
+        });
+
+    // Reposition circles
+    self.vector
+        .selectAll('circle')
+        .each(function(d) {
+            var point = self.map.latLngToLayerPoint(d);
+            this.setAttribute('cx', point.x - offset.x);
+            this.setAttribute('cy', point.y - offset.y);
+        });
 };
 
 Yolo.costs = function() {
