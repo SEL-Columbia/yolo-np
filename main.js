@@ -3,6 +3,13 @@
 // https://github.com/mbostock/bost.ocks.org/blob/gh-pages/mike/leaflet/index.html#L131-171
 
 
+// Modes
+// Cursor: null
+// Starting a line / Drawing a point: point
+// Drawing a line: point + selected
+// Select a line: selected
+
+
 Yolo = {
     tileCache: false,
     mode: null,
@@ -33,8 +40,14 @@ Yolo.init = function() {
     // Tile layer
     var funcLayer = new L.TileLayer.Functional(function(view) {
         var deferred = $.Deferred();
-        var url = 'http://mt' + Math.round(Math.random() * 3) + 
-            '.google.com/vt/lyrs=y&x={y}&y={x}&z={z}'
+        var url = 'http://mt{s}.google.com/vt/lyrs=y&x={y}&y={x}&z={z}'
+            .replace('{s}', Math.round(Math.random() * 3))
+            .replace('{z}', Math.floor(view.zoom))
+            .replace('{x}', view.tile.row)
+            .replace('{y}', view.tile.column);
+
+        var url = 'http://{s}.tiles.mapbox.com/v3/examples.map-20v6611k/{z}/{y}/{x}.png'
+            .replace('{s}', 'abcd'[Math.round(Math.random() * 3)])
             .replace('{z}', Math.floor(view.zoom))
             .replace('{x}', view.tile.row)
             .replace('{y}', view.tile.column);
@@ -49,7 +62,7 @@ Yolo.init = function() {
             enableHighAccuracy: true
         });
 
-    // Add vector layer
+    // Vector layer
     self.vector = d3.select(self.map.getPanes().overlayPane)
         .append('svg')
         .append('g')
@@ -57,6 +70,13 @@ Yolo.init = function() {
         .on('click', self.onvectorclick, true)
         .on('mouseover', self.onmouseover, true)
         .on('mouseout', self.onmouseover, true);
+
+    
+    // Control events
+    d3.select('.controls_cancel')
+        .on('click', function() {
+            self.selected = null;
+        });
 
     self.load();
 };
@@ -196,13 +216,6 @@ Yolo.saveImage = function(url, imgBlob, cb) {
     }
 };
 
-
-Yolo.status = function(status) {
-    d3.select('.header_status')
-        .html(status);
-};
-
-
 Yolo.save = function() {
     localStorage['nodes'] = JSON.stringify(this.nodes);
     localStorage['lines'] = JSON.stringify(this.lines);
@@ -248,46 +261,56 @@ Yolo.updatevectors = function() {
         });
 };
 
-Yolo.onmapclick = function(e) {
-    console.log('map click', e);
 
+Yolo.status = function(status) {
+    d3.select('.header_status')
+        .html(status);
+};
+
+Yolo.showControls = function() {
+    var controls = d3.select('.controls');
+    if (this.selected) {
+        controls.style('display', 'block');
+    } else {
+        controls.style('display', 'none');
+    }
+};
+
+Yolo.onmapclick = function(e) {
     // Leaflet event
     var self = Yolo;
-    var point = e.layerPoint;
+    var point = e.latlng;
 
-    // Draw line & poles
-    if (self.currentNode) {
-        self.vector
-            .append('svg:line')
-            .datum([self.currentNode, e.latlng])
-            .attr('class', 'line');
+    console.log('map click');
 
-        // Add power poles
-        var poles = self.intervals(self.currentNode, e.latlng, 100);
-        self.vector
-            .selectAll()
-            .data(poles)
-            .enter()
-            .append('svg:circle')            
-            .attr('r', 8)
-            .attr('class', 'pole');
+    if (self.selected) {
+        var pointA = self.selected.datum();
+        self.drawLine(pointA, point);
     }
 
-    // Draw point
-    self.vector
-        .append('svg:circle')
-        .datum(e.latlng)
-        .attr('r', 5)
-        .attr('class', 'node');
-
-    self.currentNode = e.latlng;
+    self.selected = self.drawPoint(point);
     self.updatevectors();
+    self.showControls();
 };
 
 Yolo.onvectorclick = function() {
-    console.log('vector click', d3.event.toElement);
     var self = Yolo;
-    self.selected = d3.event.toElement;
+    var e = d3.event;
+    var element = e.toElement;
+    var point = self.map.containerPointToLatLng([
+        parseInt(element.getAttribute('cx')),
+        parseInt(element.getAttribute('cy'))
+    ]);
+
+    console.log('vector click', e, element);
+    
+    if (self.selected && element.classList.contains('node')) {
+        var pointA = self.selected.datum();
+        self.drawLine(pointA, point);
+    }
+
+    self.selected = d3.select(element);
+    self.updatevectors();
     d3.event.stopPropagation();
 };
 
@@ -302,6 +325,31 @@ Yolo.onmouseover = function() {
 Yolo.onmouseout = function(){
     //console.log('mouseout', d3.event);
 
+};
+
+Yolo.drawPoint = function(point) {
+    return this.vector
+        .append('svg:circle')
+        .datum(point)
+        .attr('r', 8)
+        .attr('class', 'node');
+};
+
+Yolo.drawLine = function(pointA, pointB) {
+    this.vector
+        .append('svg:line')
+        .datum([pointA, pointB])
+        .attr('class', 'line');
+
+    // Add power poles
+    var poles = this.intervals(pointA, pointB, 100);
+    this.vector
+        .selectAll()
+        .data(poles)
+        .enter()
+        .append('svg:circle')            
+        .attr('r', 6)
+        .attr('class', 'pole');
 };
 
 Yolo.costs = function() {
@@ -328,7 +376,7 @@ Yolo.intervals = function(pointA, pointB, interval){
     var nSplits = Math.floor(dist / interval);
     var splitLat = (pointB.lat - pointA.lat) / nSplits;
     var splitLon = (pointB.lng - pointA.lng) / nSplits;
-    for (var i=0; i < nSplits; i++){
+    for (var i=1; i < nSplits; i++){
         points.push([i * splitLat + pointA.lat, i * splitLon + pointA.lng]);
     }
     return points;

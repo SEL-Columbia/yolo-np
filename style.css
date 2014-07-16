@@ -90,22 +90,23 @@ h1 {
 
 
 /* SVG Elements */
-.node {
-    cursor: pointer;
+.cursor {
     fill: red;
 }
-.node:hover {
-    fill: darkred;
-}
-
-.pole {
+.node {
     cursor: pointer;
     fill: rgb(70, 70, 196);
     stroke: rgb(195, 239, 255);
     stroke-width: 4px;
 }
-.pole:hover {
+.node:hover {
     fill: rgb(195, 239, 255);
+}
+
+.pole {
+    fill: rgba(0, 0, 0, 0.6);
+    stroke: rgba(255, 255, 255, 0.8);
+    stroke-width: 4px;
 }
 
 .line {
@@ -114,9 +115,6 @@ h1 {
     stroke-width: 5px;
     stroke-linecap: round;
     stroke-dasharray: 2 7;
-}
-.line:hover {
-    stroke-width: 6px;
 }
 
 
