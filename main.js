@@ -285,6 +285,8 @@ Yolo.ondrag = function(d) {
     var self = Yolo;
     var e = d3.event.sourceEvent;
     var id = d3.select(this).datum()[0];
+    console.log(e, d3.event);
+
     self.points[id] = self.map.containerPointToLatLng([e.x, e.y]);
     self.update();
 };
