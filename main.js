@@ -3,18 +3,14 @@
 // https://github.com/mbostock/bost.ocks.org/blob/gh-pages/mike/leaflet/index.html#L131-171
 
 
-// Modes
-// null: select/point mode
-// 'drag'
-// 'line'
-
 
 Yolo = {
     tileCache: false,
-    mode: null,
+    mode: 'point', // null, 'point', 'line'
     selected: null,
-    nodes: [],
-    lines: [],
+    id_count: 0,
+    points: {}, // {node_id: latlng}
+    lines: {}, // [[p0, p1], ...]
     map: null,
     vector: null
 };
@@ -32,8 +28,8 @@ Yolo.init = function() {
             doubleClickZoom: false,
             attributionControl: false
         })
-        .on('viewreset', self.updateVectors)
-        .on('moveend', self.updateVectors);
+        .on('viewreset', self.update)
+        .on('moveend', self.update);
 
     // Tile layer
     var funcLayer = new L.TileLayer.Functional(function(view) {
@@ -60,13 +56,9 @@ Yolo.init = function() {
             enableHighAccuracy: true
         });
 
-    // Vector layer
-    self.vector = d3.select(self.map.getPanes().overlayPane)
-        .append('svg')
-        .append('g')
-        .attr('class', 'leaflet-zoom-hide')
-        .on('mouseover', self.onmouseover, true)
-        .on('mouseout', self.onmouseover, true);
+    // Vector Layer
+    self.svg = d3.select(self.map.getPanes().overlayPane)
+        .append('svg');
 
     // Map Events
     d3.select('.map')
@@ -81,7 +73,17 @@ Yolo.init = function() {
     // Control events
     d3.select('.controls_cancel')
         .on('click', function() {
+            self.mode = null;
             self.selected = null;
+        });
+
+    d3.selectAll('.controls_point, .controls_line')
+        .on('click', function() {
+            if (this.classList.contains('controls_point')) {
+                self.mode = 'point';
+            } else {
+                self.mode = 'line';
+            }
         });
 
     self.load();
@@ -136,6 +138,7 @@ Yolo.initTileCache = function() {
     }
 };
 
+
 Yolo.getImage = function(url, cb) {
     // Retrieves an image from cache, possibly fetching it first
     var self = this;
@@ -179,6 +182,7 @@ Yolo.getImage = function(url, cb) {
     }
 };
 
+
 Yolo.fetchImage = function(url, cb) {
     var self = this;
     var xhr = new XMLHttpRequest();
@@ -191,6 +195,7 @@ Yolo.fetchImage = function(url, cb) {
     }, false);
     xhr.send();
 };
+
 
 Yolo.saveImage = function(url, imgBlob, cb) {
     var self = this;
@@ -222,10 +227,12 @@ Yolo.saveImage = function(url, imgBlob, cb) {
     }
 };
 
+
 Yolo.save = function() {
     localStorage['nodes'] = JSON.stringify(this.nodes);
     localStorage['lines'] = JSON.stringify(this.lines);
 };
+
 
 Yolo.load = function() {
     this.nodes = JSON.parse(localStorage['nodes'] || '[]');
@@ -238,24 +245,11 @@ Yolo.status = function(status) {
         .html(status);
 };
 
-Yolo.showControls = function() {
-    var controls = d3.select('.controls');
-    if (this.selected) {
-        controls.style('display', 'block');
-    } else {
-        controls.style('display', 'none');
-    }
-};
 
 Yolo.onclick = function() {
     console.log('click')
     var self = Yolo;
     var e = d3.event;
-    if (self.mode === 'drag') {
-        self.mode = 'null';
-        return;
-    }
-
     var element = e.toElement.nodeName === 'circle' ? e.toElement : null;
     var xy = element ? [
             parseInt(element.getAttribute('cx')),
@@ -263,40 +257,47 @@ Yolo.onclick = function() {
         ] : [e.x, e.y];
     var point = self.map.containerPointToLatLng(xy);
 
-    console.log(e);
-
-    if (self.selected) {
-        var pointA = d3.select(self.selected).datum();
-        self.drawLine(pointA, point);
+    if (self.dragging) {
+        return;
+    } else if (self.mode === 'point' || self.mode === 'line') {
+        var id = self.id_count++;
+        self.points[id] = point;
+        if (self.mode === 'line' && self.selected) {
+            self.lines.push([self.selected, id]);
+        }
+        self.selected = id;
+    } else {
+        self.selected = null;
     }
-
-    self.selected = self.drawPoint(point);
-    self.updateVectors();
-    self.showControls();
-    //self.lineMode();
+    self.update();
     d3.event.stopPropagation();
 };
+
 
 Yolo.ondragstart = function() {
     var self = Yolo;
     self.map.dragging.disable();
-    self.mode = 'drag';
+    self.dragging = true;
 };
+
 
 Yolo.ondrag = function(d) {
     var self = Yolo;
     var e = d3.event.sourceEvent;
-    var latlng = self.map.containerPointToLatLng([e.clientX, e.clientY]);
-    d3.select(this).datum(latlng);
-    self.updateVectors();
+    var id = d3.select(this).datum()[0];
+    self.points[id] = self.map.containerPointToLatLng([e.clientX, e.clientY]);
+    self.update();
 };
+
 
 Yolo.ondragend = function() {
     // http://stackoverflow.com/questions/19075381/d3-mouse-events-click-dragend
     console.log('dragend')
     var self = Yolo;
     self.map.dragging.enable();
+    self.dragging = false;
 };
+
 
 Yolo.onmouseover = function() {
     var element = d3.event.toElement;
@@ -306,10 +307,12 @@ Yolo.onmouseover = function() {
     }
 };
 
+
 Yolo.onmouseout = function() {
     //console.log('mouseout', d3.event);
 
 };
+
 
 Yolo.lineMode = function() {
     d3.select(document.body)
@@ -318,67 +321,79 @@ Yolo.lineMode = function() {
         });
 };
 
-Yolo.drawPoint = function(point) {
-    return this.vector
-        .append('svg:circle')
-        .datum(point)
-        .attr('r', 8)
-        .attr('class', 'node')
-        .call(this.drag)
-        .node();
+
+Yolo.update = function() {
+    window.requestAnimationFrame(Yolo.updateVectorLayer);
 };
 
-Yolo.drawLine = function(pointA, pointB) {
-    this.vector
-        .append('svg:line')
-        .datum([pointA, pointB])
-        .attr('class', 'line');
 
-    // Add power poles
-    var poles = this.intervals(pointA, pointB, 100);
-    this.vector
-        .selectAll()
-        .data(poles)
-        .enter()
-        .append('svg:circle')
-        .attr('r', 6)
-        .attr('class', 'pole');
-};
-
-Yolo.updateVectors = function() {
-    // Updates the vector layer on map move/zoom
+Yolo.updateVectorLayer = function() {
     var self = Yolo;
     var size = self.map.getSize();
     var bounds = self.map.getBounds();
     var offset = self.map.latLngToLayerPoint(bounds.getNorthWest());
 
+    // Clear layer
+    d3.select('g').remove();
+
     // Set size & reverse .map-pane transform
-    d3.select('svg')
+    var g = d3.select('svg')
         .attr('width', size.x + 'px')
         .attr('height', size.y + 'px')
-        .attr('style', '-webkit-transform: translate3d(' + offset.x + 'px,' + offset.y + 'px, 0);');
+        .attr('style', '-webkit-transform: translate3d(' + offset.x + 'px,' + offset.y + 'px, 0);')
+        // Add vector layer
+        .append('g')
+        .attr('class', 'leaflet-zoom-hide')
+        .on('mouseover', self.onmouseover, true)
+        .on('mouseout', self.onmouseover, true);
 
-    // Reposition lines
-    self.vector
-        .selectAll('line')
+    // Draw lines
+    g.selectAll()
+        .data(self.lines)
+        .enter()
+        .append('svg:line')
+        .attr('class', 'line')
         .each(function(d) {
-            var p1 = self.map.latLngToLayerPoint(d[0]);
-            var p2 = self.map.latLngToLayerPoint(d[1]);
+            var latlng0 = self.points[d[0]];
+            var latlng1 = self.points[d[1]];
+            var p1 = self.map.latLngToLayerPoint(latlng0);
+            var p2 = self.map.latLngToLayerPoint(latlng1);
             this.setAttribute('x1', p1.x - offset.x);
             this.setAttribute('y1', p1.y - offset.y);
             this.setAttribute('x2', p2.x - offset.x);
             this.setAttribute('y2', p2.y - offset.y);
+
+            // Add power poles
+            var poles = self.intervals(latlng0, latlng1, 100);
+            g.selectAll()
+                .data(poles)
+                .enter()
+                .append('svg:circle')
+                .attr('r', 6)
+                .attr('class', 'pole');
         });
 
-    // Reposition circles
-    self.vector
-        .selectAll('circle')
+    // Draw points
+    g.selectAll()
+        .data(function() {
+            var points = [];
+            for (var id in self.points) {
+                points.push([id, self.points[id]]);
+            }
+            return points;
+        })
+        .enter()
+        .append('circle')
+        .attr('class', 'point')
+        .attr('r', 12)
+        .call(self.drag)
         .each(function(d) {
-            var point = self.map.latLngToLayerPoint(d);
+            var point = self.map.latLngToLayerPoint(d[1]);
             this.setAttribute('cx', point.x - offset.x);
             this.setAttribute('cy', point.y - offset.y);
         });
 };
+
 
 Yolo.costs = function() {
     var dist = 0;
@@ -410,6 +425,7 @@ Yolo.intervals = function(pointA, pointB, interval){
     return points;
 };
 
+
 Yolo.dist = function(latA, lonA, latB, lonB){
     // http://stackoverflow.com/questions/27928/how-do-i-calculate-distance-between-two-latitude-longitude-points
     var R = 6371; // Radius of the earth in km
@@ -422,9 +438,11 @@ Yolo.dist = function(latA, lonA, latB, lonB){
     return R * c; // Distance in km
 };
 
+
 Yolo.deg2rad = function(deg){
     return deg * Math.PI / 180;
 };
+
 
 Yolo.rad2deg = function(rad){
     return rad * 180 / Math.PI;
