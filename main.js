@@ -250,7 +250,8 @@ Yolo.onclick = function() {
     console.log('click')
     var self = Yolo;
     var e = d3.event;
-    var element = e.toElement.nodeName === 'circle' ? e.toElement : null;
+    var element = e.toElement.nodeName === 'circle' && element.classList.contains('point') ? 
+        e.toElement : null;
     var xy = element ? [
             parseInt(element.getAttribute('cx')),
             parseInt(element.getAttribute('cy'))
@@ -260,8 +261,12 @@ Yolo.onclick = function() {
     if (self.dragging) {
         return;
     } else if (self.mode === 'point' || self.mode === 'line') {
-        var id = self.id_count++;
-        self.points[id] = point;
+        if (element) {
+            var id = parseInt(d3.select(element).data()[0]);
+        } else {
+            var id = self.id_count++;
+            self.points[id] = point;
+        }
         if (self.mode === 'line' && self.selected) {
             self.lines.push([self.selected, id]);
         }
@@ -284,10 +289,8 @@ Yolo.ondragstart = function() {
 Yolo.ondrag = function(d) {
     var self = Yolo;
     var e = d3.event.sourceEvent;
-    console.log(d3.event)
     var id = d3.select(this).datum()[0];
     var xy = e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.x, e.y];
-    console.log(xy);
     self.points[id] = self.map.containerPointToLatLng(xy);
     self.update();
 };
@@ -317,11 +320,8 @@ Yolo.onmouseout = function() {
 };
 
 
-Yolo.lineMode = function() {
-    d3.select(document.body)
-        .on('mousemove', function() {
-            console.log(d3.event)
-        });
+Yolo.onmousemove = function() {
+    
 };
 
 
@@ -365,15 +365,21 @@ Yolo.updateVectorLayer = function() {
             this.setAttribute('y1', p1.y - offset.y);
             this.setAttribute('x2', p2.x - offset.x);
             this.setAttribute('y2', p2.y - offset.y);
-
+            
             // Add power poles
             var poles = self.intervals(latlng0, latlng1, 100);
+            console.log('poles', poles);
             g.selectAll()
                 .data(poles)
                 .enter()
                 .append('svg:circle')
                 .attr('r', 6)
-                .attr('class', 'pole');
+                .attr('class', 'pole')
+                .each(function(d){
+                    var point = self.map.latLngToLayerPoint(d);
+                    this.setAttribute('cx', point.x - offset.x);
+                    this.setAttribute('cy', point.y - offset.y);
+                });
         });
 
     // Draw points
@@ -388,7 +394,7 @@ Yolo.updateVectorLayer = function() {
         .enter()
         .append('circle')
         .attr('class', 'point')
-        .attr('r', 12)
+        .attr('r', 15)
         .call(self.drag)
         .each(function(d) {
             var point = self.map.latLngToLayerPoint(d[1]);
