@@ -116,6 +116,12 @@ h1 {
     stroke-dasharray: 2 7;
 }
 
+.location {
+    fill: red;
+    stroke: pink;
+    stroke-width: 5px;
+}
+
 
 /* Costs table */
 .costs {

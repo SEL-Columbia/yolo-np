@@ -8,11 +8,11 @@ Yolo = {
     tileCache: false,
     mode: 'point', // null, 'point', 'line'
     selected: null,
+    location: null,
     id_count: 0,
     points: {}, // {node_id: latlng}
     lines: {}, // [[p0, p1], ...]
     map: null,
-    vector: null
 };
 
 
@@ -49,12 +49,7 @@ Yolo.init = function() {
         return deferred.promise();
     });
 
-    self.map.addLayer(funcLayer)
-        .locate({
-            setView: true,
-            maxZoom: 20,
-            enableHighAccuracy: true
-        });
+    self.map.addLayer(funcLayer);
 
     // Vector Layer
     self.svg = d3.select(self.map.getPanes().overlayPane)
@@ -85,6 +80,9 @@ Yolo.init = function() {
                 self.mode = 'line';
             }
         });
+    
+    d3.select('.controls_locate')
+        .on('click', self.locate);
 
     self.load();
 };
@@ -245,6 +243,28 @@ Yolo.status = function(status) {
         .html(status);
 };
 
+Yolo.locate = function(onoff) {
+    var self = Yolo;
+    if (true || onoff === true) {
+        self.map
+            .locate({
+                setView: true,
+                watch: true,
+                maxZoom: 20,
+                enableHighAccuracy: true
+            })
+            .on('locationfound', function(e) {
+                console.log(e)
+                self.location = e.latlng;
+                self.update();
+            });
+    } else {
+        self.map.stopLocate();
+        self.location = null;
+        self.update();
+    }
+};
+
 
 Yolo.onclick = function() {
     console.log('click')
@@ -401,6 +421,16 @@ Yolo.updateVectorLayer = function() {
             this.setAttribute('cx', point.x - offset.x);
             this.setAttribute('cy', point.y - offset.y);
         });
+        
+    // Draw location
+    if (self.location) {
+        var p = self.map.latLngToLayerPoint(self.location);
+        g.append('circle')
+            .attr('class', 'location')
+            .attr('r', 10)
+            .attr('cx', p.x - offset.x)
+            .attr('cy', p.y - offset.y);
+    }
 };
 
 
