@@ -20,7 +20,8 @@ Yolo.init = function() {
     var self = this;
 
     self.initTileCache();
-
+    
+    // Leaflet & events
     self.map = L.map('map', {
             center: [40.809400, -73.960029],
             zoom: 16,
@@ -29,7 +30,17 @@ Yolo.init = function() {
             attributionControl: false
         })
         .on('viewreset', self.update)
-        .on('moveend', self.update);
+        .on('moveend', self.update)
+        .locate({
+            watch: true,
+            maxZoom: 20,
+            enableHighAccuracy: true
+        })
+        .on('locationfound', function(e) {
+            self.location = e.latlng;
+            self.update();
+        });
+
 
     // Tile layer
     var funcLayer = new L.TileLayer.Functional(function(view) {
@@ -71,6 +82,11 @@ Yolo.init = function() {
             self.mode = null;
             self.selected = null;
         });
+        
+    d3.select('.controls_locate')
+        .on('click', function() {
+            if (self.location) self.map.panTo(self.location);
+        });
 
     d3.selectAll('.controls_point, .controls_line')
         .on('click', function() {
@@ -80,9 +96,6 @@ Yolo.init = function() {
                 self.mode = 'line';
             }
         });
-    
-    d3.select('.controls_locate')
-        .on('click', self.locate);
 
     self.load();
 };
@@ -242,29 +255,6 @@ Yolo.status = function(status) {
     d3.select('.header_status')
         .html(status);
 };
-
-Yolo.locate = function(onoff) {
-    var self = Yolo;
-    if (true || onoff === true) {
-        self.map
-            .locate({
-                setView: true,
-                watch: true,
-                maxZoom: 20,
-                enableHighAccuracy: true
-            })
-            .on('locationfound', function(e) {
-                console.log(e)
-                self.location = e.latlng;
-                self.update();
-            });
-    } else {
-        self.map.stopLocate();
-        self.location = null;
-        self.update();
-    }
-};
-
 
 Yolo.onclick = function() {
     console.log('click')
