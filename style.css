@@ -55,14 +55,12 @@ h1 {
     text-align: center;
     cursor: pointer;
     padding: 7px 18px;
+    margin: 0 2.5%;
     font-size: 17px;
     font-weight: bold;
     background: rgb(242, 242, 242);
     border-bottom: 2px solid rgb(173, 173, 173);
     border-radius: 5px;
-}
-.controls_line {
-    margin: 0 5%;
 }
 .controls_btn:hover {
     background: rgb(220, 220, 220);
