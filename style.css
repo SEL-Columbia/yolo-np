@@ -44,7 +44,7 @@ h1 {
     left: 0;
     width: 100%;
     box-sizing: border-box;
-    padding: 14px;
+    padding: 12px;
     text-align: center;
     background: rgba(221, 221, 221, 0.9);
     box-shadow: 0 -3px 5px rgba(0,0,0,0.3);
@@ -54,12 +54,16 @@ h1 {
     cursor: pointer;
     height: 32px;
     width: 32px;
-    margin: 0 20px;
+    border-radius: 7px;
+    padding: 8px;
+    margin: 0 15px;
     display: inline-block;
     fill: currentColor;
+    background: #f1f1f1;
 }
-.controls_btn:hover {
-    fill: #888;
+.controls_btn:hover,
+.controls_btn.active {
+    background: #bbb;
 }
 
 .cursor_coordinates {
@@ -92,7 +96,8 @@ h1 {
     stroke: rgb(195, 239, 255);
     stroke-width: 4px;
 }
-.point:hover {
+.point:hover,
+.point.selected {
     fill: rgb(195, 239, 255);
 }
 

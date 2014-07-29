@@ -6,13 +6,14 @@
 
 Yolo = {
     tileCache: false,
-    mode: 'point', // null, 'point', 'line'
+    mode: 'point', // 'point' || 'line'
     selected: null,
-    location: null,
-    id_count: 0,
     points: {}, // {node_id: latlng}
     lines: {}, // [[p0, p1], ...]
     map: null,
+    touchevent: null, // For long press events
+    location: null,
+    id_count: 0
 };
 
 
@@ -38,7 +39,7 @@ Yolo.init = function() {
         })
         .on('locationfound', function(e) {
             self.location = e.latlng;
-            self.update();
+            //self.update();
         });
 
 
@@ -68,6 +69,9 @@ Yolo.init = function() {
 
     // Map Events
     d3.select('.map')
+        .on('touchstart', self.ontouchstart)
+        .on('touchmove', self.ontouchmove)
+        .on('touchend', self.ontouchend)
         .on('click', self.onclick);
 
     self.drag = d3.behavior.drag()
@@ -77,12 +81,6 @@ Yolo.init = function() {
         .on('dragend', self.ondragend);
 
     // Control events
-    d3.select('.controls_cancel')
-        .on('click', function() {
-            self.mode = null;
-            self.selected = null;
-        });
-        
     d3.select('.controls_locate')
         .on('click', function() {
             if (self.location) self.map.panTo(self.location);
@@ -90,11 +88,14 @@ Yolo.init = function() {
 
     d3.selectAll('.controls_point, .controls_line')
         .on('click', function() {
+            d3.select('.controls_btn.active')
+                .classed({active: false});
             if (this.classList.contains('controls_point')) {
                 self.mode = 'point';
             } else {
                 self.mode = 'line';
             }
+            d3.select(this).classed({active: true});
         });
 
     self.load();
@@ -256,21 +257,52 @@ Yolo.status = function(status) {
         .html(status);
 };
 
-Yolo.onclick = function() {
-    console.log('click')
+
+Yolo.ontouchstart = function() {
+    // Used to detect long press
+    console.log('touchstart')
     var self = Yolo;
-    var e = d3.event;
-    var element = e.toElement.nodeName === 'circle' && element.classList.contains('point') ? 
-        e.toElement : null;
+    self.touchevent = d3.event;
+    window.clearTimeout(self.touchtimer);
+    self.touchtimer = window.setTimeout(self.onlongpress, 700);
+};
+
+
+Yolo.ontouchmove = function() {
+    console.log('touchmove')
+    if (!Yolo.touchevent) return;
+    var touch = d3.event.touches[0];
+    var ts = Yolo.touchevent.touches[0];
+    var dx = Math.abs(touch.screenX - ts.screenX);
+    var dy = Math.abs(touch.screenY - ts.screenY);
+    if (dx > 3 || dy > 3) {
+        Yolo.touchevent = null;
+    }
+};
+
+
+Yolo.ontouchend = function() {
+    console.log('touchend', Yolo.touchevent)
+    var self = Yolo;
+    if (!self.touchevent) return;
+    Yolo.touchevent = null;
+};
+
+
+Yolo.onlongpress = function() {
+    console.log('longpress')
+    if (!Yolo.touchevent) return;
+    var self = Yolo;    
+    var e = self.touchevent;
+    var touch = e.touches[0];
+    var element = e.target.classList.contains('point') ? e.target : null;
     var xy = element ? [
             parseInt(element.getAttribute('cx')),
             parseInt(element.getAttribute('cy'))
-        ] : [e.x, e.y];
+        ] : [touch.screenX, touch.screenY];
     var point = self.map.containerPointToLatLng(xy);
-
-    if (self.dragging) {
-        return;
-    } else if (self.mode === 'point' || self.mode === 'line') {
+    
+    if (self.mode === 'point' || self.mode === 'line') {
         if (element) {
             var id = parseInt(d3.select(element).data()[0]);
         } else {
@@ -281,18 +313,29 @@ Yolo.onclick = function() {
             self.lines.push([self.selected, id]);
         }
         self.selected = id;
-    } else {
-        self.selected = null;
     }
     self.update();
-    d3.event.stopPropagation();
+    navigator.vibrate(100);
+}
+
+
+Yolo.onclick = function() {
+    console.log('click')
+    var self = Yolo;
+    var e = d3.event;
+    var element = e.toElement && e.toElement.classList.contains('point') ? e.toElement : null;
+    if (element) {
+        self.selected = parseInt(d3.select(element).data()[0]);
+    }
+    self.update();
+    self.touchevent = null;
 };
 
 
 Yolo.ondragstart = function() {
     var self = Yolo;
     self.map.dragging.disable();
-    self.dragging = true;
+    self.touchevent = null;
 };
 
 
@@ -311,29 +354,7 @@ Yolo.ondragend = function() {
     console.log('dragend')
     var self = Yolo;
     self.map.dragging.enable();
-    self.dragging = false;
 };
-
-
-Yolo.onmouseover = function() {
-    var element = d3.event.toElement;
-    //console.log('mouseover', element.className)
-    if (element.classList.contains('node') || element.classList.contains('line')) {
-        //element.classList.push('');
-    }
-};
-
-
-Yolo.onmouseout = function() {
-    //console.log('mouseout', d3.event);
-
-};
-
-
-Yolo.onmousemove = function() {
-    
-};
-
 
 Yolo.update = function() {
     window.requestAnimationFrame(Yolo.updateVectorLayer);
@@ -341,6 +362,7 @@ Yolo.update = function() {
 
 
 Yolo.updateVectorLayer = function() {
+    console.log('update')
     var self = Yolo;
     var size = self.map.getSize();
     var bounds = self.map.getBounds();
@@ -402,7 +424,10 @@ Yolo.updateVectorLayer = function() {
         })
         .enter()
         .append('circle')
-        .attr('class', 'point')
+        .attr('class', function(d) {
+            console.log(d[0], self.selected);
+            return d[0] == self.selected ? 'point selected' : 'point';
+        })
         .attr('r', 15)
         .call(self.drag)
         .each(function(d) {
