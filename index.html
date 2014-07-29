@@ -7,15 +7,35 @@
 </head>
 
 <body>
-    <div class="status">Welcome!</div>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+        <symbol id="icon-location" viewBox="0 0 512 512">
+            <path d="m455 100l-183 365c-3 7-8 10-16 10c-1 0-2 0-4 0c-4-1-8-3-10-7c-3-3-4-7-4-11l0-164l-165 0c-4 0-8-2-11-4c-3-3-6-6-7-10c-1-5 0-9 2-12c1-4 4-7 8-9l366-183c2-1 5-2 8-2c5 0 9 2 13 6c3 2 4 6 5 9c1 4 0 8-2 12z"/>
+        </symbol>
+        <symbol id="icon-line" viewBox="0 0 512 512">
+            <path d="m281 352c24 12 36 31 36 58c0 17-6 31-17 43c-12 12-27 18-44 18c-17 0-32-6-44-18c-11-12-17-26-17-43c0-27 12-46 36-58c0 0 0-193 0-193c-24-12-36-31-36-57c0-17 6-31 17-43c12-12 27-18 44-18c17 0 32 6 44 18c11 12 17 26 17 43c0 26-12 45-36 57c0 0 0 193 0 193m-60-250c0 10 4 18 10 25c7 7 15 10 25 10c10 0 18-3 25-10c7-7 11-15 11-25c0-10-4-18-11-25c-7-7-15-10-25-10c-10 0-18 3-25 10c-6 7-10 15-10 25m35 342c10 0 18-3 25-10c7-7 11-15 11-24c0-11-4-19-11-26c-7-7-15-10-25-10c-10 0-18 3-25 10c-6 7-10 15-10 26c0 9 4 17 10 24c7 7 15 10 25 10"/>
+        </symbol>
+        <symbol id="icon-point" viewBox="0 0 512 512">
+            <path d="m256 101c-28 0-54 7-78 20c-24 14-43 33-57 57c-13 24-20 50-20 78c0 28 7 54 20 78c14 24 33 43 57 57c24 13 50 20 78 20c28 0 54-7 78-20c24-14 43-33 57-57c13-24 20-50 20-78c0-28-7-54-20-78c-14-24-33-43-57-57c-24-13-50-20-78-20z m219 155c0 40-9 77-29 110c-20 34-46 60-80 80c-33 20-70 29-110 29c-40 0-77-9-110-29c-34-20-60-46-80-80c-20-33-29-70-29-110c0-40 9-77 29-110c20-34 46-60 80-80c33-20 70-29 110-29c40 0 77 9 110 29c34 20 60 46 80 80c20 33 29 70 29 110z"/>
+        </symbol>
+        <symbol id="icon-pin" viewBox="0 0 512 512">
+            <path d="m329 183c0-20-7-38-21-52c-15-14-32-21-52-21c-20 0-37 7-52 21c-14 14-21 32-21 52c0 20 7 37 21 52c15 14 32 21 52 21c20 0 37-7 52-21c14-15 21-32 21-52z m73 0c0 21-3 38-9 51l-104 221c-3 6-8 11-14 15c-6 4-12 5-19 5c-7 0-13-1-19-5c-6-4-11-9-14-15l-104-221c-6-13-9-30-9-51c0-41 14-75 43-104c28-28 63-42 103-42c40 0 75 14 103 42c29 29 43 63 43 104z"/>
+        </symbol>
+        <symbol id="icon-cancel" viewBox="0 0 512 512">
+            <path d="m365 321c0-5-2-10-6-13l-51-52l51-52c4-3 6-8 6-13c0-5-2-9-6-13l-25-25c-4-4-8-6-13-6c-5 0-10 2-13 6l-52 51l-52-51c-3-4-8-6-13-6c-5 0-9 2-13 6l-25 25c-4 4-6 8-6 13c0 5 2 10 6 13l51 52l-51 52c-4 3-6 8-6 13c0 5 2 9 6 13l25 25c4 4 8 6 13 6c5 0 10-2 13-6l52-51l52 51c3 4 8 6 13 6c5 0 9-2 13-6l25-25c4-4 6-8 6-13z m110-65c0 40-9 77-29 110c-20 34-46 60-80 80c-33 20-70 29-110 29c-40 0-77-9-110-29c-34-20-60-46-80-80c-20-33-29-70-29-110c0-40 9-77 29-110c20-34 46-60 80-80c33-20 70-29 110-29c40 0 77 9 110 29c34 20 60 46 80 80c20 33 29 70 29 110z"/>
+        </symbol>
+    </svg>
+    
     <div class="controls">
-        <div class="controls_btn controls_point">Point</div>
-        <div class="controls_btn controls_line">Line</div>
-        <div class="controls_btn controls_cancel">Cancel</div>
-        <div class="controls_btn controls_locate">Locate</div>
+        <svg class="controls_btn controls_point"><use xlink:href="#icon-point"></use></svg>
+        <svg class="controls_btn controls_line"><use xlink:href="#icon-line"></use></svg>
+        <svg class="controls_btn controls_cancel"><use xlink:href="#icon-cancel"></use></svg>
+        <svg class="controls_btn controls_locate"><use xlink:href="#icon-location"></use></svg>
     </div>
+
     <div class="cursor_coordinates"></div>
+
     <div id="map" class="map"></div>
+
     <div class="costs">
         <h1>Grid Costs</h1>
         <table class="costs_table">
@@ -62,7 +82,7 @@
                 </tr>
             </tbody>
         </table>
-    </div>
+    </div>    
     <script src="lib.js"></script>
     <script src="main.js"></script>
     <script>

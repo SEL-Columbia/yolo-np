@@ -51,19 +51,15 @@ h1 {
     z-index: 2;
 }
 .controls_btn {
-    display: inline-block;
-    text-align: center;
     cursor: pointer;
-    padding: 7px 18px;
-    margin: 0 2.5%;
-    font-size: 17px;
-    font-weight: bold;
-    background: rgb(242, 242, 242);
-    border-bottom: 2px solid rgb(173, 173, 173);
-    border-radius: 5px;
+    height: 32px;
+    width: 32px;
+    margin: 0 20px;
+    display: inline-block;
+    fill: currentColor;
 }
 .controls_btn:hover {
-    background: rgb(220, 220, 220);
+    fill: #888;
 }
 
 .cursor_coordinates {

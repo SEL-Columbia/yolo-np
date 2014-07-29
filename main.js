@@ -350,7 +350,7 @@ Yolo.updateVectorLayer = function() {
     d3.select('g').remove();
 
     // Set size & reverse .map-pane transform
-    var g = d3.select('svg')
+    var g = d3.select('.map svg')
         .attr('width', size.x + 'px')
         .attr('height', size.y + 'px')
         .attr('style', '-webkit-transform: translate3d(' + offset.x + 'px,' + offset.y + 'px, 0);')
@@ -378,7 +378,6 @@ Yolo.updateVectorLayer = function() {
             
             // Add power poles
             var poles = self.intervals(latlng0, latlng1, 100);
-            console.log('poles', poles);
             g.selectAll()
                 .data(poles)
                 .enter()
