@@ -71,9 +71,8 @@ Yolo.init = function() {
     d3.select('.map')
         .on('touchstart', self.ontouchstart)
         .on('touchmove', self.ontouchmove)
-        .on('touchend', self.ontouchend)
-        .on('click', self.onclick);
-
+        .on('touchend', self.ontouchend);
+    
     self.drag = d3.behavior.drag()
         .origin(function(d) { return d; })
         .on('drag', self.ondrag)
@@ -260,7 +259,7 @@ Yolo.status = function(status) {
 
 Yolo.ontouchstart = function() {
     // Used to detect long press
-    console.log('touchstart')
+    console.log('touchstart', d3.event.target);
     var self = Yolo;
     self.touchevent = d3.event;
     window.clearTimeout(self.touchtimer);
@@ -282,18 +281,27 @@ Yolo.ontouchmove = function() {
 
 
 Yolo.ontouchend = function() {
-    console.log('touchend', Yolo.touchevent)
+    console.log('touchend', d3.event.target)
     var self = Yolo;
-    if (!self.touchevent) return;
-    Yolo.touchevent = null;
+    var e = d3.event;
+    window.clearTimeout(self.touchtimer);
+    if (self.touchevent) {
+        var tapTime = e.timeStamp - self.touchevent.timeStamp;
+        if (e.target === self.touchevent.target && tapTime < 300) {
+            var id = d3.select(e.target).data()[0];
+            self.selected = parseInt(id);
+            self.update();
+        }
+    }
+    self.touchevent = null;
 };
 
 
 Yolo.onlongpress = function() {
     console.log('longpress')
-    if (!Yolo.touchevent) return;
     var self = Yolo;    
     var e = self.touchevent;
+    if (!e) return;
     var touch = e.touches[0];
     var element = e.target.classList.contains('point') ? e.target : null;
     var xy = element ? [
@@ -313,28 +321,17 @@ Yolo.onlongpress = function() {
             self.lines.push([self.selected, id]);
         }
         self.selected = id;
+        navigator.vibrate(100);
+        self.update();
     }
-    self.update();
-    navigator.vibrate(100);
-}
-
-
-Yolo.onclick = function() {
-    console.log('click')
-    var self = Yolo;
-    var e = d3.event;
-    var element = e.toElement && e.toElement.classList.contains('point') ? e.toElement : null;
-    if (element) {
-        self.selected = parseInt(d3.select(element).data()[0]);
-    }
-    self.update();
     self.touchevent = null;
-};
+}
 
 
 Yolo.ondragstart = function() {
     var self = Yolo;
     self.map.dragging.disable();
+    window.clearTimeout(self.touchtimer);
     self.touchevent = null;
 };
 
@@ -352,8 +349,7 @@ Yolo.ondrag = function(d) {
 Yolo.ondragend = function() {
     // http://stackoverflow.com/questions/19075381/d3-mouse-events-click-dragend
     console.log('dragend')
-    var self = Yolo;
-    self.map.dragging.enable();
+    Yolo.map.dragging.enable();
 };
 
 Yolo.update = function() {
@@ -369,7 +365,7 @@ Yolo.updateVectorLayer = function() {
     var offset = self.map.latLngToLayerPoint(bounds.getNorthWest());
 
     // Clear layer
-    d3.select('g').remove();
+    d3.select('.map g').remove();
 
     // Set size & reverse .map-pane transform
     var g = d3.select('.map svg')
@@ -382,6 +378,16 @@ Yolo.updateVectorLayer = function() {
         .on('mouseover', self.onmouseover, true)
         .on('mouseout', self.onmouseover, true);
 
+    // Draw location
+    if (self.location) {
+        var p = self.map.latLngToLayerPoint(self.location);
+        g.append('circle')
+            .attr('class', 'location')
+            .attr('r', 10)
+            .attr('cx', p.x - offset.x)
+            .attr('cy', p.y - offset.y);
+    }
+    
     // Draw lines
     g.selectAll()
         .data(self.lines)
@@ -404,7 +410,7 @@ Yolo.updateVectorLayer = function() {
                 .data(poles)
                 .enter()
                 .append('svg:circle')
-                .attr('r', 6)
+                .attr('r', 4)
                 .attr('class', 'pole')
                 .each(function(d){
                     var point = self.map.latLngToLayerPoint(d);
@@ -428,23 +434,15 @@ Yolo.updateVectorLayer = function() {
             console.log(d[0], self.selected);
             return d[0] == self.selected ? 'point selected' : 'point';
         })
-        .attr('r', 15)
-        .call(self.drag)
+        .attr('r', 8)
         .each(function(d) {
             var point = self.map.latLngToLayerPoint(d[1]);
             this.setAttribute('cx', point.x - offset.x);
             this.setAttribute('cy', point.y - offset.y);
         });
-        
-    // Draw location
-    if (self.location) {
-        var p = self.map.latLngToLayerPoint(self.location);
-        g.append('circle')
-            .attr('class', 'location')
-            .attr('r', 10)
-            .attr('cx', p.x - offset.x)
-            .attr('cy', p.y - offset.y);
-    }
+    
+    g.selectAll('.selected')
+        .call(self.drag);
 };
 
 

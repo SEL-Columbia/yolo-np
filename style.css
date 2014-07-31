@@ -93,12 +93,13 @@ h1 {
 .point {
     cursor: pointer;
     fill: rgb(70, 70, 196);
-    stroke: rgb(195, 239, 255);
-    stroke-width: 4px;
+    stroke: rgba(0, 0, 0, 0);
+    stroke-width: 15px;
 }
 .point:hover,
 .point.selected {
-    fill: rgb(195, 239, 255);
+    fill: pink;
+    stroke: pink;
 }
 
 .pole {
