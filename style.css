@@ -93,27 +93,26 @@ h1 {
 .point {
     cursor: pointer;
     fill: rgb(70, 70, 196);
-    stroke: rgba(0, 0, 0, 0);
-    stroke-width: 15px;
+    stroke: rgba(70, 70, 196, 0.2);
+    stroke-width: 24px;
 }
 .point:hover,
 .point.selected {
-    fill: pink;
-    stroke: pink;
+    fill: rgb(68, 152, 214);
+    stroke: rgba(68, 152, 214, 0.6);
+    stroke-width: 20px;
 }
 
 .pole {
-    fill: rgba(0, 0, 0, 0.6);
-    stroke: rgba(255, 255, 255, 0.8);
-    stroke-width: 4px;
+    fill: rgb(185, 66, 185);
 }
 
 .line {
     fill: none;
     stroke: rgb(255, 96, 255);
-    stroke-width: 5px;
+    stroke-width: 2px;
     stroke-linecap: round;
-    stroke-dasharray: 2 7;
+    stroke-dasharray: 2 4;
 }
 
 .location {

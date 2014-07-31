@@ -6,14 +6,13 @@
 
 Yolo = {
     tileCache: false,
-    mode: 'point', // 'point' || 'line'
     selected: null,
-    points: {}, // {node_id: latlng}
-    lines: {}, // [[p0, p1], ...]
+    points: {}, // {id: {x: lon, y: lat}}
+    lines: {},  // {id: {p1: id1, p2: id2}}
     map: null,
     touchevent: null, // For long press events
     location: null,
-    id_count: 0
+    id_count: 1
 };
 
 
@@ -84,17 +83,22 @@ Yolo.init = function() {
         .on('click', function() {
             if (self.location) self.map.panTo(self.location);
         });
-
-    d3.selectAll('.controls_point, .controls_line')
+        
+    d3.select('.controls_delete')
         .on('click', function() {
-            d3.select('.controls_btn.active')
-                .classed({active: false});
-            if (this.classList.contains('controls_point')) {
-                self.mode = 'point';
-            } else {
-                self.mode = 'line';
+            if (self.selected) {
+                delete self.points[self.selected];
+                console.log('dete')
+                var lines = [];
+                self.lines.forEach(function(line) {
+                    if (line[0] != self.selected && line[1] != self.selected) {
+                        lines.push(line);
+                    }
+                });
+                self.lines = lines;
+                self.selected = null;
+                self.update();
             }
-            d3.select(this).classed({active: true});
         });
 
     self.load();
@@ -269,13 +273,15 @@ Yolo.ontouchstart = function() {
 
 Yolo.ontouchmove = function() {
     console.log('touchmove')
-    if (!Yolo.touchevent) return;
-    var touch = d3.event.touches[0];
-    var ts = Yolo.touchevent.touches[0];
-    var dx = Math.abs(touch.screenX - ts.screenX);
-    var dy = Math.abs(touch.screenY - ts.screenY);
-    if (dx > 3 || dy > 3) {
-        Yolo.touchevent = null;
+    var self = Yolo;
+    if (self.touchevent) {
+        var touch = d3.event.touches[0];
+        var ts = self.touchevent.touches[0];
+        var dx = Math.abs(touch.screenX - ts.screenX);
+        var dy = Math.abs(touch.screenY - ts.screenY);
+        if (dx > 5 || dy > 5) {
+            self.touchevent = null;
+        }
     }
 };
 
@@ -310,39 +316,38 @@ Yolo.onlongpress = function() {
         ] : [touch.screenX, touch.screenY];
     var point = self.map.containerPointToLatLng(xy);
     
-    if (self.mode === 'point' || self.mode === 'line') {
-        if (element) {
-            var id = parseInt(d3.select(element).data()[0]);
-        } else {
-            var id = self.id_count++;
-            self.points[id] = point;
-        }
-        if (self.mode === 'line' && self.selected) {
-            self.lines.push([self.selected, id]);
-        }
-        self.selected = id;
-        navigator.vibrate(100);
-        self.update();
+    if (element) {
+        var id = parseInt(d3.select(element).data()[0]);
+    } else {
+        var id = self.id_count++;
+        self.points[id] = point;
     }
+    if (self.selected) {
+        self.lines.push([self.selected, id]);
+    }
+    self.selected = id;
+    navigator.vibrate(100);
+    self.update();
     self.touchevent = null;
 }
 
 
 Yolo.ondragstart = function() {
-    var self = Yolo;
-    self.map.dragging.disable();
-    window.clearTimeout(self.touchtimer);
-    self.touchevent = null;
+    console.log('dragstart')
+    Yolo.map.dragging.disable();
 };
 
 
 Yolo.ondrag = function(d) {
+    console.log('dragging')
     var self = Yolo;
     var e = d3.event.sourceEvent;
     var id = d3.select(this).datum()[0];
     var xy = e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.x, e.y];
     self.points[id] = self.map.containerPointToLatLng(xy);
     self.update();
+    window.clearTimeout(self.touchtimer);
+    self.touchevent = null;
 };
 
 
@@ -352,12 +357,18 @@ Yolo.ondragend = function() {
     Yolo.map.dragging.enable();
 };
 
-Yolo.update = function() {
-    window.requestAnimationFrame(Yolo.updateVectorLayer);
+
+Yolo.updateControls = function() {
+    d3.select('.controls_delete');
 };
 
 
-Yolo.updateVectorLayer = function() {
+Yolo.update = function() {
+    window.requestAnimationFrame(Yolo.updateVectors);
+};
+
+
+Yolo.updateVectors = function() {
     console.log('update')
     var self = Yolo;
     var size = self.map.getSize();
@@ -410,7 +421,7 @@ Yolo.updateVectorLayer = function() {
                 .data(poles)
                 .enter()
                 .append('svg:circle')
-                .attr('r', 4)
+                .attr('r', 3)
                 .attr('class', 'pole')
                 .each(function(d){
                     var point = self.map.latLngToLayerPoint(d);
@@ -431,10 +442,9 @@ Yolo.updateVectorLayer = function() {
         .enter()
         .append('circle')
         .attr('class', function(d) {
-            console.log(d[0], self.selected);
             return d[0] == self.selected ? 'point selected' : 'point';
         })
-        .attr('r', 8)
+        .attr('r', 6)
         .each(function(d) {
             var point = self.map.latLngToLayerPoint(d[1]);
             this.setAttribute('cx', point.x - offset.x);
@@ -462,7 +472,7 @@ Yolo.costs = function() {
 };
 
 
-Yolo.intervals = function(pointA, pointB, interval){
+Yolo.intervals = function(pointA, pointB, interval) {
     // Returns a list of points between A and B at intervals of X meters
     var self = this;
     var points = [];
@@ -470,14 +480,14 @@ Yolo.intervals = function(pointA, pointB, interval){
     var nSplits = Math.floor(dist / interval);
     var splitLat = (pointB.lat - pointA.lat) / nSplits;
     var splitLon = (pointB.lng - pointA.lng) / nSplits;
-    for (var i=1; i < nSplits; i++){
+    for (var i=1; i < nSplits; i++) {
         points.push([i * splitLat + pointA.lat, i * splitLon + pointA.lng]);
     }
     return points;
 };
 
 
-Yolo.dist = function(latA, lonA, latB, lonB){
+Yolo.dist = function(latA, lonA, latB, lonB) {
     // http://stackoverflow.com/questions/27928/how-do-i-calculate-distance-between-two-latitude-longitude-points
     var R = 6371; // Radius of the earth in km
     var dLat = this.deg2rad(latB - latA);
@@ -490,11 +500,15 @@ Yolo.dist = function(latA, lonA, latB, lonB){
 };
 
 
-Yolo.deg2rad = function(deg){
+Yolo.deg2rad = function(deg) {
     return deg * Math.PI / 180;
 };
 
 
-Yolo.rad2deg = function(rad){
+Yolo.rad2deg = function(rad) {
     return rad * 180 / Math.PI;
 };
+
+
+
+
