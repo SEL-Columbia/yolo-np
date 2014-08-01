@@ -328,6 +328,7 @@ Yolo.onlongpress = function() {
     navigator.vibrate(100);
     self.update();
     self.touchevent = null;
+    self.save();
 }
 
 
