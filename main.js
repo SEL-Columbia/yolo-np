@@ -1,13 +1,8 @@
-// https://github.com/zetter/voronoi-maps/blob/master/lib/voronoi_map.js
-// http://chriszetter.com/voronoi-map/examples/uk-supermarkets/
-// https://github.com/mbostock/bost.ocks.org/blob/gh-pages/mike/leaflet/index.html#L131-171
-
-
 
 Yolo = {
     tileCache: false,
     selected: null,
-    points: {}, // {id: {x: lon, y: lat}}
+    points: {}, // {id: {lat: 10, lng: 10}}
     lines: {},  // {id: {p1: id1, p2: id2}}
     map: null,
     touchevent: null, // For long press events
@@ -88,11 +83,10 @@ Yolo.init = function() {
         .on('click', function() {
             if (self.selected) {
                 delete self.points[self.selected];
-                console.log('dete')
-                var lines = [];
-                self.lines.forEach(function(line) {
-                    if (line[0] != self.selected && line[1] != self.selected) {
-                        lines.push(line);
+                var lines = {};
+                d3.map(self.lines).forEach(function(id, points) {
+                    if (points[0] != self.selected && points[1] != self.selected) {
+                        lines[id] = points;
                     }
                 });
                 self.lines = lines;
@@ -244,14 +238,19 @@ Yolo.saveImage = function(url, imgBlob, cb) {
 
 
 Yolo.save = function() {
-    localStorage['nodes'] = JSON.stringify(this.nodes);
+    localStorage['points'] = JSON.stringify(this.points);
     localStorage['lines'] = JSON.stringify(this.lines);
 };
 
 
 Yolo.load = function() {
-    this.nodes = JSON.parse(localStorage['nodes'] || '[]');
-    this.lines = JSON.parse(localStorage['lines'] || '[]');
+    this.points = JSON.parse(localStorage['points'] || '{}');
+    this.lines = JSON.parse(localStorage['lines'] || '{}');
+    var ids = d3.keys(Yolo.points)
+        .concat(d3.keys(Yolo.lines))
+        .map(function(i) { return parseInt(i); });
+    this.id_count = Math.max.apply(null, ids) + 1;
+    this.update();
 };
 
 
@@ -314,16 +313,16 @@ Yolo.onlongpress = function() {
             parseInt(element.getAttribute('cx')),
             parseInt(element.getAttribute('cy'))
         ] : [touch.screenX, touch.screenY];
-    var point = self.map.containerPointToLatLng(xy);
+    var latlng = self.map.containerPointToLatLng(xy);
     
     if (element) {
         var id = parseInt(d3.select(element).data()[0]);
     } else {
         var id = self.id_count++;
-        self.points[id] = point;
+        self.points[id] = {lat: latlng.lat, lng: latlng.lng};
     }
     if (self.selected) {
-        self.lines.push([self.selected, id]);
+        self.lines[self.id_count++] = [self.selected, id];
     }
     self.selected = id;
     navigator.vibrate(100);
@@ -355,6 +354,7 @@ Yolo.ondragend = function() {
     // http://stackoverflow.com/questions/19075381/d3-mouse-events-click-dragend
     console.log('dragend')
     Yolo.map.dragging.enable();
+    Yolo.save();
 };
 
 
@@ -401,22 +401,22 @@ Yolo.updateVectors = function() {
     
     // Draw lines
     g.selectAll()
-        .data(self.lines)
+        .data(d3.values(self.lines))
         .enter()
         .append('svg:line')
         .attr('class', 'line')
         .each(function(d) {
-            var latlng0 = self.points[d[0]];
-            var latlng1 = self.points[d[1]];
-            var p1 = self.map.latLngToLayerPoint(latlng0);
-            var p2 = self.map.latLngToLayerPoint(latlng1);
+            var latlng1 = self.points[d[0]];
+            var latlng2 = self.points[d[1]];
+            var p1 = self.map.latLngToLayerPoint(latlng1);
+            var p2 = self.map.latLngToLayerPoint(latlng2);
             this.setAttribute('x1', p1.x - offset.x);
             this.setAttribute('y1', p1.y - offset.y);
             this.setAttribute('x2', p2.x - offset.x);
             this.setAttribute('y2', p2.y - offset.y);
             
             // Add power poles
-            var poles = self.intervals(latlng0, latlng1, 100);
+            var poles = self.intervals(latlng1, latlng2, 100);
             g.selectAll()
                 .data(poles)
                 .enter()
