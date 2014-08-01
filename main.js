@@ -246,10 +246,10 @@ Yolo.save = function() {
 Yolo.load = function() {
     this.points = JSON.parse(localStorage['points'] || '{}');
     this.lines = JSON.parse(localStorage['lines'] || '{}');
-    var ids = d3.keys(Yolo.points)
-        .concat(d3.keys(Yolo.lines))
+    var ids = d3.keys(this.points)
+        .concat(d3.keys(this.lines))
         .map(function(i) { return parseInt(i); });
-    this.id_count = Math.max.apply(null, ids) + 1;
+    this.id_count = ids.length ? Math.max.apply(null, ids) + 1 : 1;
     this.update();
 };
 
