@@ -12,9 +12,14 @@ Yolo = {
 
 
 Yolo.init = function() {
-    var self = this;
+    this.initTileCache();
+    
+};
 
-    self.initTileCache();
+
+Yolo.initMap = function() {
+    var self = this;
+    $('.loading').hide();
     
     // Leaflet & events
     self.map = L.map('map', {
@@ -40,12 +45,6 @@ Yolo.init = function() {
     // Tile layer
     var funcLayer = new L.TileLayer.Functional(function(view) {
         var deferred = $.Deferred();
-        var url = 'http://mt{s}.google.com/vt/lyrs=y&x={y}&y={x}&z={z}'
-            .replace('{s}', Math.round(Math.random() * 3))
-            .replace('{z}', Math.floor(view.zoom))
-            .replace('{x}', view.tile.row)
-            .replace('{y}', view.tile.column);
-
         var url = 'http://{s}.tiles.mapbox.com/v3/examples.map-20v6611k/{z}/{y}/{x}.png'
             .replace('{s}', 'abcd'[Math.round(Math.random() * 3)])
             .replace('{z}', Math.floor(view.zoom))
@@ -383,14 +382,16 @@ Yolo.initTileCache = function() {
         window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
 
         function init(fs) {
+            console.log('FileSystem API tile cache initialized');
             self.fs_cache = fs;
             self.tileCache = true;
+            self.initMap();
         }
 
         function fileErrorHandler(e) {
             console.log(e)
         }
-
+        
         window.requestFileSystem(
             window.TEMPORARY, 20*1024*1024, init, fileErrorHandler);
 
@@ -398,6 +399,7 @@ Yolo.initTileCache = function() {
     // http://www.html5rocks.com/en/tutorials/indexeddb/todo/
     // Blob support was just added in Chrome Canary (as of July 2014)
     } else if (window.indexedDB) {
+        console.log('Initializing IndexedDB tile cache');
         var request = window.indexedDB.open('tileCache', 5);
 
         request.onerror = function(event) {
@@ -411,7 +413,7 @@ Yolo.initTileCache = function() {
             self.idb_cache.onerror = function(event) {
                 console.log("Error creating/accessing IndexedDB database");
             };
-            //self.db.getObjectStore('tiles').clear();
+            self.initMap();
         };
 
         request.onupgradeneeded = function(event) {
