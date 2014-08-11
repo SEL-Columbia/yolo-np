@@ -239,6 +239,7 @@ Yolo.ondrag = function(d) {
     window.clearTimeout(self.touchtimer);
     self.touchevent = null;
     self.dragging = true;
+    self.showControls();
 };
 
 
