@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html manifest="cache.appcache">
+<html manifest2="cache.appcache">
 <head>
     <title>Your Local Network Planner</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,13 +28,11 @@
     </svg>
     
     <div class="controls">
-        <svg class="controls_btn controls_point"><use xlink:href="#icon-point"></use></svg>
-        <svg class="controls_btn controls_line"><use xlink:href="#icon-line"></use></svg>
+        <div class="controls_info"></div>
         <svg class="controls_btn controls_delete"><use xlink:href="#icon-delete"></use></svg>
-        <svg class="controls_btn controls_locate"><use xlink:href="#icon-location"></use></svg>
     </div>
 
-    <div class="cursor_coordinates"></div>
+    <svg class="location_btn"><use xlink:href="#icon-location"></use></svg>
     
     <div class="loading">
         Loading...

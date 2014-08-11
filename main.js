@@ -2,6 +2,7 @@
 Yolo = {
     tileCache: false,
     selected: null,
+    dragging: false,
     points: {}, // {id: {lat: 10, lng: 10}}
     lines: {},  // {id: {p1: id1, p2: id2}}
     map: null,
@@ -73,7 +74,7 @@ Yolo.initMap = function() {
         .on('dragend', self.ondragend);
 
     // Control events
-    d3.select('.controls_locate')
+    d3.select('.location_btn')
         .on('click', function() {
             if (self.location) self.map.panTo(self.location);
         });
@@ -153,17 +154,21 @@ Yolo.ontouchend = function() {
     window.clearTimeout(self.touchtimer);
     if (self.touchevent) {
         var tapTime = e.timeStamp - self.touchevent.timeStamp;
-        if (e.target === self.touchevent.target && tapTime < 300) {
-            var id = d3.select(e.target).data()[0];
-            self.selected = parseInt(id);
-            self.update();
+        var id = e.target.dataset.id;
+        if (e.target === self.touchevent.target && tapTime < 300 && id) {
+            self.selected = id;
+        } else {
+            self.selected = null;
         }
+        self.showControls();
+        self.update();
     }
     self.touchevent = null;
 };
 
 
 Yolo.onlongpress = function() {
+    // Creates a new point or line
     console.log('longpress')
     var self = Yolo;    
     var e = self.touchevent;
@@ -183,19 +188,33 @@ Yolo.onlongpress = function() {
         self.points[id] = {lat: latlng.lat, lng: latlng.lng};
     }
     if (self.selected) {
-        self.lines[self.id_count++] = [self.selected, id];
+        // Add line if it doesn't already exist
+        var addLine = d3.values(self.lines)
+            .every(function(line) {
+                if ((self.selected === line[0] && id === line[1]) ||
+                    (self.selected === line[1] && id === line[0])) {
+                    return false;
+                }
+                return true;
+            });
+        if (addLine) {
+            self.lines[self.id_count++] = [self.selected, id];
+        }
     }
     self.selected = id;
     navigator.vibrate(100);
-    self.update();
     self.touchevent = null;
     self.save();
+    self.showControls();
+    self.update();
 }
 
 
 Yolo.ondragstart = function() {
     console.log('dragstart')
-    Yolo.map.dragging.disable();
+    var self = Yolo;
+    self.map.dragging.disable();
+    self.dragging = true;
 };
 
 
@@ -209,19 +228,40 @@ Yolo.ondrag = function(d) {
     self.update();
     window.clearTimeout(self.touchtimer);
     self.touchevent = null;
+    self.dragging = true;
 };
 
 
 Yolo.ondragend = function() {
     // http://stackoverflow.com/questions/19075381/d3-mouse-events-click-dragend
     console.log('dragend')
-    Yolo.map.dragging.enable();
-    Yolo.save();
+    var self = Yolo;
+    self.map.dragging.enable();
+    self.save();
+    self.dragging = false;
+    self.update();
 };
 
 
-Yolo.updateControls = function() {
-    d3.select('.controls_delete');
+Yolo.showControls = function() {
+    if (this.selected) {
+        var line = this.lines[this.selected];
+        var point = this.points[this.selected];
+        if (point) {
+            var info = '#' + this.selected + ': ' + point.lat.toFixed(3) + ', ' + point.lng.toFixed(3);
+        } else if (line) {
+            var p1 = this.points[line[0]];
+            var p2 = this.points[line[1]];
+            var dist = this.dist(p1.lat, p1.lng, p2.lat, p2.lng);
+            var info = '#' + this.selected + ': ' + dist.toFixed(2) + ' km';
+        }
+        $('.controls_info').text(info);
+        $('.location_btn').attr('class', 'location_btn higher');
+        $('.controls').show();
+    } else {
+        $('.controls').hide();
+        $('.location_btn').attr('class', 'location_btn');
+    }
 };
 
 
@@ -263,34 +303,42 @@ Yolo.updateVectors = function() {
     
     // Draw lines
     g.selectAll()
-        .data(d3.values(self.lines))
+        .data(d3.entries(self.lines))
         .enter()
         .append('svg:line')
-        .attr('class', 'line')
+        .attr('class', function(d) {
+            return d.key == self.selected ? 'line selected' : 'line';
+        })
+        .attr('data-id', function(d) {
+            return d.key;
+        })
         .each(function(d) {
-            var latlng1 = self.points[d[0]];
-            var latlng2 = self.points[d[1]];
+            var latlng1 = self.points[d.value[0]];
+            var latlng2 = self.points[d.value[1]];
             var p1 = self.map.latLngToLayerPoint(latlng1);
             var p2 = self.map.latLngToLayerPoint(latlng2);
             this.setAttribute('x1', p1.x - offset.x);
             this.setAttribute('y1', p1.y - offset.y);
             this.setAttribute('x2', p2.x - offset.x);
             this.setAttribute('y2', p2.y - offset.y);
-            
-            // Add power poles
-            var poles = self.intervals(latlng1, latlng2, 100);
-            g.selectAll()
-                .data(poles)
-                .enter()
-                .append('svg:circle')
-                .attr('r', 3)
-                .attr('class', 'pole')
-                .each(function(d){
-                    var point = self.map.latLngToLayerPoint(d);
-                    this.setAttribute('cx', point.x - offset.x);
-                    this.setAttribute('cy', point.y - offset.y);
-                });
+
+            // Add power poles if line is selected
+            // (d[0] === self.selected || d[1] === self.selected)
+            if (!self.dragging) {                
+                g.selectAll()
+                    .data(self.intervals(latlng1, latlng2, 100))
+                    .enter()
+                    .append('svg:circle')
+                    .attr('r', 3)
+                    .attr('class', 'pole')
+                    .each(function(d){
+                        var point = self.map.latLngToLayerPoint(d);
+                        this.setAttribute('cx', point.x - offset.x);
+                        this.setAttribute('cy', point.y - offset.y);
+                    });
+            }
         });
+
 
     // Draw points
     g.selectAll()
@@ -305,6 +353,9 @@ Yolo.updateVectors = function() {
         .append('circle')
         .attr('class', function(d) {
             return d[0] == self.selected ? 'point selected' : 'point';
+        })
+        .attr('data-id', function(d) {
+            return d[0];
         })
         .attr('r', 6)
         .each(function(d) {
