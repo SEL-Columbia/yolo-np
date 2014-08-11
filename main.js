@@ -174,19 +174,28 @@ Yolo.onlongpress = function() {
     var e = self.touchevent;
     if (!e) return;
     var touch = e.touches[0];
-    var element = e.target.classList.contains('point') ? e.target : null;
-    var xy = element ? [
-            parseInt(element.getAttribute('cx')),
-            parseInt(element.getAttribute('cy'))
-        ] : [touch.screenX, touch.screenY];
-    var latlng = self.map.containerPointToLatLng(xy);
     
-    if (element) {
-        var id = parseInt(d3.select(element).data()[0]);
+    if (e.target.classList.contains('point')) {
+        // Exisiting point
+        var id = parseInt(e.target.dataset.id);
     } else {
+        // Add a new point
         var id = self.id_count++;
+        var latlng = self.map.containerPointToLatLng([
+            touch.screenX,
+            touch.screenY
+        ]);
         self.points[id] = {lat: latlng.lat, lng: latlng.lng};
+        
+        if (e.target.classList.contains('line')) {
+            // Split line if point falls on it
+            var lineId = parseInt(e.target.dataset.id);
+            var line = self.lines[lineId];
+            self.lines[lineId] = [line[0], id];
+            self.lines[self.id_count++] = [line[1], id];
+        }
     }
+    
     if (self.selected) {
         // Add line if it doesn't already exist
         var addLine = d3.values(self.lines)
@@ -197,6 +206,7 @@ Yolo.onlongpress = function() {
                 }
                 return true;
             });
+        
         if (addLine) {
             self.lines[self.id_count++] = [self.selected, id];
         }
