@@ -197,7 +197,7 @@ Yolo.onlongpress = function() {
         }
     }
     
-    if (self.selected) {
+    if (self.selected && self.points[self.selected]) {
         // Add line if it doesn't already exist
         var addLine = d3.values(self.lines)
             .every(function(line) {
