@@ -83,6 +83,7 @@ Yolo.initMap = function() {
         .on('click', function() {
             if (self.selected) {
                 delete self.points[self.selected];
+                delete self.lines[self.selected];
                 var lines = {};
                 d3.map(self.lines).forEach(function(id, points) {
                     if (points[0] != self.selected && points[1] != self.selected) {
