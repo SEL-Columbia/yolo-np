@@ -8,3 +8,6 @@ http://sel-columbia.github.io/yolo-np
 Usage:
 Double click to add power poles/lines.
 
+TODO:
+Test base64 encoding + IndexedDB. http://stackoverflow.com/questions/6150289/how-to-convert-image-into-base64-string-using-javascript
+
