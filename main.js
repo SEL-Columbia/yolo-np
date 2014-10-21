@@ -17,6 +17,23 @@ Yolo.init = function() {
     
 };
 
+function convertImgToBase64(url, callback, outputFormat){
+    var canvas = document.createElement('CANVAS'),
+        ctx = canvas.getContext('2d'),
+        img = new Image;
+    img.crossOrigin = 'Anonymous';
+    img.onload = function(){
+        var dataURL;
+        canvas.height = img.height;
+        canvas.width = img.width;
+        ctx.drawImage(img, 0, 0);
+        dataURL = canvas.toDataURL(outputFormat);
+        callback.call(this, dataURL);
+        canvas = null; 
+    };
+    img.src = url;
+}
+
 
 Yolo.initMap = function() {
     var self = this;
@@ -441,7 +458,7 @@ Yolo.initTileCache = function() {
     // FileSystem API
     // http://www.html5rocks.com/en/tutorials/file/filesystem/
     // It's faster than IndexedDB, but is deprecated
-    if (window.requestFileSystem || window.webkitRequestFileSystem) {
+    if (false){ //window.requestFileSystem || window.webkitRequestFileSystem) {
         window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
 
         function init(fs) {
@@ -496,7 +513,7 @@ Yolo.getImage = function(url, cb) {
     // Remove subdomain from tile image url
     var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
 
-    if (self.fs_cache) {
+    if (false && self.fs_cache) {
         self.fs_cache.root.getFile(imgKey, {}, function(fileEntry) {
             fileEntry.file(function(imgFile) {
                 var URL = window.URL || window.webkitURL;
@@ -517,9 +534,9 @@ Yolo.getImage = function(url, cb) {
         request.onsuccess = function(event) {
             var imgFile = event.target.result;
             if (imgFile) {
-                var URL = window.URL || window.webkitURL;
-                var imgURL = URL.createObjectURL(imgFile);
-                cb(imgURL);
+                //var URL = window.URL || window.webkitURL;
+                //var imgURL = URL.createObjectURL(imgFile);
+                cb(imgFile);
             } else {
                 self.fetchImage(url, cb);
             }
@@ -532,6 +549,12 @@ Yolo.getImage = function(url, cb) {
 
 
 Yolo.fetchImage = function(url, cb) {
+    var self = Yolo;
+    convertImgToBase64(url, function(dataURL) {
+        self.saveImage(url, dataURL, cb);
+    }, 'image/png');
+    return;
+    
     var self = this;
     var xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
@@ -549,7 +572,7 @@ Yolo.saveImage = function(url, imgBlob, cb) {
     var self = this;
     var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
 
-    if (self.fs_cache) {
+    if (false && self.fs_cache) {
         function fileErrorHandler(e) {
             console.log(imgKey, e);
         }
