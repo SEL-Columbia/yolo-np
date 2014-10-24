@@ -1,5 +1,4 @@
-
-Yolo = {
+var Yolo = {
     tileCache: false,
     selected: null,
     dragging: false,
@@ -11,29 +10,34 @@ Yolo = {
     id_count: 1
 };
 
-
 Yolo.init = function() {
-    this.initTileCache();
-    
-};
+    var self = this;
 
-function convertImgToBase64(url, callback, outputFormat){
-    var canvas = document.createElement('CANVAS'),
-        ctx = canvas.getContext('2d'),
-        img = new Image;
-    img.crossOrigin = 'Anonymous';
-    img.onload = function(){
-        var dataURL;
-        canvas.height = img.height;
-        canvas.width = img.width;
-        ctx.drawImage(img, 0, 0);
-        dataURL = canvas.toDataURL(outputFormat);
-        callback.call(this, dataURL);
-        canvas = null; 
+    // Initialize IndexedDB
+    // http://www.html5rocks.com/en/tutorials/indexeddb/todo/
+    // Blob support was just added in Chrome Canary (as of July 2014)
+    console.log('Initializing IndexedDB tile cache');
+    var request = window.indexedDB.open('tileCache', 5);
+
+    request.onerror = function(event) {
+        console.log("Error creating/accessing IndexedDB database");
     };
-    img.src = url;
-}
 
+    request.onsuccess = function(event) {
+        console.log("Success creating/accessing IndexedDB database");
+        self.tileCache = true;
+        self.idb_cache = request.result;
+        self.idb_cache.onerror = function(event) {
+            console.log("Error creating/accessing IndexedDB database");
+        };
+        self.initMap();
+    };
+
+    request.onupgradeneeded = function(event) {
+        self.idb_cache = event.target.result;
+        self.idb_cache.createObjectStore('tiles');
+    };
+};
 
 Yolo.initMap = function() {
     var self = this;
@@ -80,15 +84,15 @@ Yolo.initMap = function() {
 
     // Map Events
     d3.select('.map')
-        .on('touchstart', self.ontouchstart)
-        .on('touchmove', self.ontouchmove)
-        .on('touchend', self.ontouchend);
+        .on('touchstart', MapEvents.ontouchstart)
+        .on('touchmove', MapEvents.ontouchmove)
+        .on('touchend', MapEvents.ontouchend);
     
     self.drag = d3.behavior.drag()
         .origin(function(d) { return d; })
-        .on('drag', self.ondrag)
-        .on('dragstart', self.ondragstart)
-        .on('dragend', self.ondragend);
+        .on('drag', MapEvents.ondrag)
+        .on('dragstart', MapEvents.ondragstart)
+        .on('dragend', MapEvents.ondragend);
 
     // Control events
     d3.select('.location_btn')
@@ -116,12 +120,10 @@ Yolo.initMap = function() {
     self.load();
 };
 
-
 Yolo.save = function() {
     localStorage['points'] = JSON.stringify(this.points);
     localStorage['lines'] = JSON.stringify(this.lines);
 };
-
 
 Yolo.load = function() {
     this.points = JSON.parse(localStorage['points'] || '{}');
@@ -133,144 +135,67 @@ Yolo.load = function() {
     this.update();
 };
 
-
 Yolo.status = function(status) {
     d3.select('.header_status')
         .html(status);
 };
 
+Yolo.getImage = function(url, cb) {
+    // Retrieves an image from cache, possibly fetching it first
+    var self = this;
 
-Yolo.ontouchstart = function() {
-    // Used to detect long press
-    console.log('touchstart', d3.event.target);
-    var self = Yolo;
-    self.touchevent = d3.event;
-    window.clearTimeout(self.touchtimer);
-    self.touchtimer = window.setTimeout(self.onlongpress, 700);
-};
+    if (!self.tileCache) return cb(url);
 
+    // Remove subdomain from tile image url
+    var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
+    var store = self.idb_cache
+        .transaction(['tiles'], 'readwrite')
+        .objectStore('tiles');
+    var request = store.get(imgKey);
 
-Yolo.ontouchmove = function() {
-    console.log('touchmove')
-    var self = Yolo;
-    if (self.touchevent) {
-        var touch = d3.event.touches[0];
-        var ts = self.touchevent.touches[0];
-        var dx = Math.abs(touch.screenX - ts.screenX);
-        var dy = Math.abs(touch.screenY - ts.screenY);
-        if (dx > 5 || dy > 5) {
-            self.touchevent = null;
-        }
-    }
-};
-
-
-Yolo.ontouchend = function() {
-    console.log('touchend', d3.event.target)
-    var self = Yolo;
-    var e = d3.event;
-    window.clearTimeout(self.touchtimer);
-    if (self.touchevent) {
-        var tapTime = e.timeStamp - self.touchevent.timeStamp;
-        var id = e.target.dataset.id;
-        if (e.target === self.touchevent.target && tapTime < 300 && id) {
-            self.selected = id;
+    request.onsuccess = function(event) {
+        var imgFile = event.target.result;
+        if (imgFile) {
+            //var URL = window.URL || window.webkitURL;
+            //var imgURL = URL.createObjectURL(imgFile);
+            cb(imgFile);
         } else {
-            self.selected = null;
+            self.fetchImage(url, cb);
         }
-        self.showControls();
-        self.update();
-    }
-    self.touchevent = null;
+    };
+    request.onerror = function(event) {
+        console.log('error');
+    };
 };
 
-
-Yolo.onlongpress = function() {
-    // Creates a new point or line
-    console.log('longpress')
-    var self = Yolo;    
-    var e = self.touchevent;
-    if (!e) return;
-    var touch = e.touches[0];
+Yolo.fetchImage = function(url, cb) {
+    var self = Yolo;
+    Utils.convertImgToBase64(url, function(dataURL) {
+        self.saveImage(url, dataURL, cb);
+    }, 'image/png');
+    return;
     
-    if (e.target.classList.contains('point')) {
-        // Exisiting point
-        var id = parseInt(e.target.dataset.id);
-    } else {
-        // Add a new point
-        var id = self.id_count++;
-        var latlng = self.map.containerPointToLatLng([
-            touch.screenX,
-            touch.screenY
-        ]);
-        self.points[id] = {lat: latlng.lat, lng: latlng.lng};
-        
-        if (e.target.classList.contains('line')) {
-            // Split line if point falls on it
-            var lineId = parseInt(e.target.dataset.id);
-            var line = self.lines[lineId];
-            self.lines[lineId] = [line[0], id];
-            self.lines[self.id_count++] = [line[1], id];
+    var self = this;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'blob';
+    xhr.addEventListener('load', function() {
+        if (xhr.status === 200) {
+            self.saveImage(url, xhr.response, cb);
         }
-    }
-    
-    if (self.selected && self.points[self.selected]) {
-        // Add line if it doesn't already exist
-        var addLine = d3.values(self.lines)
-            .every(function(line) {
-                if ((self.selected === line[0] && id === line[1]) ||
-                    (self.selected === line[1] && id === line[0])) {
-                    return false;
-                }
-                return true;
-            });
-        
-        if (addLine) {
-            self.lines[self.id_count++] = [self.selected, id];
-        }
-    }
-    self.selected = id;
-    navigator.vibrate(100);
-    self.touchevent = null;
-    self.save();
-    self.showControls();
-    self.update();
-}
-
-
-Yolo.ondragstart = function() {
-    console.log('dragstart')
-    var self = Yolo;
-    self.map.dragging.disable();
-    self.dragging = true;
+    }, false);
+    xhr.send();
 };
 
-
-Yolo.ondrag = function(d) {
-    console.log('dragging')
-    var self = Yolo;
-    var e = d3.event.sourceEvent;
-    var id = d3.select(this).datum()[0];
-    var xy = e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.x, e.y];
-    self.points[id] = self.map.containerPointToLatLng(xy);
-    self.update();
-    window.clearTimeout(self.touchtimer);
-    self.touchevent = null;
-    self.dragging = true;
-    self.showControls();
+Yolo.saveImage = function(url, imgBlob, cb) {
+    var self = this;
+    var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
+    self.idb_cache
+        .transaction(['tiles'], 'readwrite')
+        .objectStore('tiles')
+        .put(imgBlob, imgKey);
+    self.getImage(url, cb);
 };
-
-
-Yolo.ondragend = function() {
-    // http://stackoverflow.com/questions/19075381/d3-mouse-events-click-dragend
-    console.log('dragend')
-    var self = Yolo;
-    self.map.dragging.enable();
-    self.save();
-    self.dragging = false;
-    self.update();
-};
-
 
 Yolo.showControls = function() {
     if (this.selected) {
@@ -293,11 +218,9 @@ Yolo.showControls = function() {
     }
 };
 
-
 Yolo.update = function() {
     window.requestAnimationFrame(Yolo.updateVectors);
 };
-
 
 Yolo.updateVectors = function() {
     console.log('update')
@@ -317,8 +240,8 @@ Yolo.updateVectors = function() {
         // Add vector layer
         .append('g')
         .attr('class', 'leaflet-zoom-hide')
-        .on('mouseover', self.onmouseover, true)
-        .on('mouseout', self.onmouseover, true);
+        .on('mouseover', MapEvents.onmouseover, true)
+        .on('mouseout', MapEvents.onmouseover, true);
 
     // Draw location
     if (self.location) {
@@ -398,7 +321,150 @@ Yolo.updateVectors = function() {
 };
 
 
-Yolo.costs = function() {
+
+var MapEvents = {};
+MapEvents.ontouchstart = function() {
+    // Used to detect long press
+    console.log('touchstart', d3.event.target);
+    Yolo.touchevent = d3.event;
+    window.clearTimeout(Yolo.touchtimer);
+    Yolo.touchtimer = window.setTimeout(MapEvents.onlongpress, 700);
+};
+
+
+MapEvents.ontouchmove = function() {
+    console.log('touchmove')
+    if (Yolo.touchevent) {
+        var touch = d3.event.touches[0];
+        var ts = Yolo.touchevent.touches[0];
+        var dx = Math.abs(touch.screenX - ts.screenX);
+        var dy = Math.abs(touch.screenY - ts.screenY);
+        if (dx > 5 || dy > 5) {
+            Yolo.touchevent = null;
+        }
+    }
+};
+
+MapEvents.ontouchend = function() {
+    console.log('touchend', d3.event.target)
+    var e = d3.event;
+    window.clearTimeout(Yolo.touchtimer);
+    if (Yolo.touchevent) {
+        var tapTime = e.timeStamp - self.touchevent.timeStamp;
+        var id = e.target.dataset.id;
+        if (e.target === self.touchevent.target && tapTime < 300 && id) {
+            Yolo.selected = id;
+        } else {
+            Yolo.selected = null;
+        }
+        Yolo.showControls();
+        Yolo.update();
+    }
+    Yolo.touchevent = null;
+};
+
+MapEvents.onlongpress = function() {
+    // Creates a new point or line
+    console.log('longpress')
+    var e = Yolo.touchevent;
+    if (!e) return;
+    var touch = e.touches[0];
+    
+    if (e.target.classList.contains('point')) {
+        // Exisiting point
+        var id = parseInt(e.target.dataset.id);
+    } else {
+        // Add a new point
+        var id = self.id_count++;
+        var latlng = Yolo.map.containerPointToLatLng([
+            touch.screenX,
+            touch.screenY
+        ]);
+        Yolo.points[id] = {lat: latlng.lat, lng: latlng.lng};
+        
+        if (e.target.classList.contains('line')) {
+            // Split line if point falls on it
+            var lineId = parseInt(e.target.dataset.id);
+            var line = self.lines[lineId];
+            Yolo.lines[lineId] = [line[0], id];
+            Yolo.lines[self.id_count++] = [line[1], id];
+        }
+    }
+    
+    if (self.selected && self.points[self.selected]) {
+        // Add line if it doesn't already exist
+        var addLine = d3.values(self.lines)
+            .every(function(line) {
+                if ((self.selected === line[0] && id === line[1]) ||
+                    (self.selected === line[1] && id === line[0])) {
+                    return false;
+                }
+                return true;
+            });
+        
+        if (addLine) {
+            self.lines[self.id_count++] = [self.selected, id];
+        }
+    }
+    self.selected = id;
+    navigator.vibrate(100);
+    self.touchevent = null;
+    self.save();
+    self.showControls();
+    self.update();
+};
+
+MapEvents.ondragstart = function() {
+    console.log('dragstart')
+    var self = Yolo;
+    self.map.dragging.disable();
+    self.dragging = true;
+};
+
+MapEvents.ondrag = function(d) {
+    console.log('dragging')
+    var self = MapEvents;
+    var e = d3.event.sourceEvent;
+    var id = d3.select(this).datum()[0];
+    var xy = e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.x, e.y];
+    self.points[id] = self.map.containerPointToLatLng(xy);
+    self.update();
+    window.clearTimeout(self.touchtimer);
+    Yolo.touchevent = null;
+    Yolo.dragging = true;
+    Yolo.showControls();
+};
+
+MapEvents.ondragend = function() {
+    // http://stackoverflow.com/questions/19075381/d3-mouse-events-click-dragend
+    console.log('dragend')
+    Yolo.map.dragging.enable();
+    Yolo.save();
+    MapEvents.dragging = false;
+    Yolo.update();
+};
+
+
+
+var Utils = {};
+Utils.convertImgToBase64 = function(url, callback, outputFormat){
+    var canvas = document.createElement('CANVAS'),
+        ctx = canvas.getContext('2d'),
+        img = new Image;
+    img.crossOrigin = 'Anonymous';
+    img.onload = function(){
+        var dataURL;
+        canvas.height = img.height;
+        canvas.width = img.width;
+        ctx.drawImage(img, 0, 0);
+        dataURL = canvas.toDataURL(outputFormat);
+        callback.call(this, dataURL);
+        canvas = null; 
+    };
+    img.src = url;
+};
+
+Utils.costs = function() {
     var dist = 0;
     for (var i=0, pointA; pointA = this.points[i]; i++) {
         var pointB = this.points[i + 1];
@@ -413,8 +479,7 @@ Yolo.costs = function() {
     };
 };
 
-
-Yolo.intervals = function(pointA, pointB, interval) {
+Utils.intervals = function(pointA, pointB, interval) {
     // Returns a list of points between A and B at intervals of X meters
     var self = this;
     var points = [];
@@ -428,8 +493,7 @@ Yolo.intervals = function(pointA, pointB, interval) {
     return points;
 };
 
-
-Yolo.dist = function(latA, lonA, latB, lonB) {
+Utils.dist = function(latA, lonA, latB, lonB) {
     // http://stackoverflow.com/questions/27928/how-do-i-calculate-distance-between-two-latitude-longitude-points
     var R = 6371; // Radius of the earth in km
     var dLat = this.deg2rad(latB - latA);
@@ -442,161 +506,14 @@ Yolo.dist = function(latA, lonA, latB, lonB) {
 };
 
 
-Yolo.deg2rad = function(deg) {
+Utils.deg2rad = function(deg) {
     return deg * Math.PI / 180;
 };
 
-
-Yolo.rad2deg = function(rad) {
+Utils.rad2deg = function(rad) {
     return rad * 180 / Math.PI;
 };
 
-
-Yolo.initTileCache = function() {
-    var self = this;
-
-    // FileSystem API
-    // http://www.html5rocks.com/en/tutorials/file/filesystem/
-    // It's faster than IndexedDB, but is deprecated
-    if (false){ //window.requestFileSystem || window.webkitRequestFileSystem) {
-        window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
-
-        function init(fs) {
-            console.log('FileSystem API tile cache initialized');
-            self.fs_cache = fs;
-            self.tileCache = true;
-            self.initMap();
-        }
-
-        function fileErrorHandler(e) {
-            console.log(e)
-        }
-        
-        window.requestFileSystem(
-            window.TEMPORARY, 20*1024*1024, init, fileErrorHandler);
-
-    // IndexedDB
-    // http://www.html5rocks.com/en/tutorials/indexeddb/todo/
-    // Blob support was just added in Chrome Canary (as of July 2014)
-    } else if (window.indexedDB) {
-        console.log('Initializing IndexedDB tile cache');
-        var request = window.indexedDB.open('tileCache', 5);
-
-        request.onerror = function(event) {
-            console.log("Error creating/accessing IndexedDB database");
-        };
-
-        request.onsuccess = function(event) {
-            console.log("Success creating/accessing IndexedDB database");
-            self.tileCache = true;
-            self.idb_cache = request.result;
-            self.idb_cache.onerror = function(event) {
-                console.log("Error creating/accessing IndexedDB database");
-            };
-            self.initMap();
-        };
-
-        request.onupgradeneeded = function(event) {
-            self.idb_cache = event.target.result;
-            self.idb_cache.createObjectStore('tiles');
-        };
-    }
-};
-
-
-Yolo.getImage = function(url, cb) {
-    // Retrieves an image from cache, possibly fetching it first
-    var self = this;
-
-    if (!self.tileCache) return cb(url);
-
-    // Remove subdomain from tile image url
-    var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
-
-    if (false && self.fs_cache) {
-        self.fs_cache.root.getFile(imgKey, {}, function(fileEntry) {
-            fileEntry.file(function(imgFile) {
-                var URL = window.URL || window.webkitURL;
-                var imgURL = URL.createObjectURL(imgFile);
-                cb(imgURL);
-            });
-        }, function onerror(e) {
-            if (e.NOT_FOUND_ERR) {
-                self.fetchImage(url, cb);
-            }
-        });
-    } else if (self.idb_cache) {
-        var store = self.idb_cache
-            .transaction(['tiles'], 'readwrite')
-            .objectStore('tiles');
-        var request = store.get(imgKey);
-
-        request.onsuccess = function(event) {
-            var imgFile = event.target.result;
-            if (imgFile) {
-                //var URL = window.URL || window.webkitURL;
-                //var imgURL = URL.createObjectURL(imgFile);
-                cb(imgFile);
-            } else {
-                self.fetchImage(url, cb);
-            }
-        };
-        request.onerror = function(event) {
-            console.log('error');
-        };
-    }
-};
-
-
-Yolo.fetchImage = function(url, cb) {
-    var self = Yolo;
-    convertImgToBase64(url, function(dataURL) {
-        self.saveImage(url, dataURL, cb);
-    }, 'image/png');
-    return;
-    
-    var self = this;
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.responseType = 'blob';
-    xhr.addEventListener('load', function() {
-        if (xhr.status === 200) {
-            self.saveImage(url, xhr.response, cb);
-        }
-    }, false);
-    xhr.send();
-};
-
-
-Yolo.saveImage = function(url, imgBlob, cb) {
-    var self = this;
-    var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
-
-    if (false && self.fs_cache) {
-        function fileErrorHandler(e) {
-            console.log(imgKey, e);
-        }
-        self.fs_cache.root.getFile(imgKey, {create: true}, function(fileEntry) {
-            fileEntry.createWriter(function(fileWriter){
-                fileWriter.onwriteend = function(e) {
-                    self.getImage(url, cb);
-                };
-
-                fileWriter.onerror = function(e) {
-                    console.log('Write failed: ' + e.toString());
-                };
-                fileWriter.write(imgBlob);
-                self.getImage(url, cb);
-            }, fileErrorHandler);
-        }, fileErrorHandler);
-    } else if (self.idb_cache) {
-        self.idb_cache
-            .transaction(['tiles'], 'readwrite')
-            .objectStore('tiles')
-            .put(imgBlob, imgKey);
-        self.getImage(url, cb);
-    }
-};
 
 
 
