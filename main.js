@@ -25,17 +25,16 @@ Yolo.init = function() {
 
     request.onsuccess = function(event) {
         console.log("Success creating/accessing IndexedDB database");
-        self.tileCache = true;
-        self.idb_cache = request.result;
-        self.idb_cache.onerror = function(event) {
+        self.idb = request.result;
+        self.idb.onerror = function(event) {
             console.log("Error creating/accessing IndexedDB database");
         };
         self.initMap();
     };
 
     request.onupgradeneeded = function(event) {
-        self.idb_cache = event.target.result;
-        self.idb_cache.createObjectStore('tiles');
+        self.idb = event.target.result;
+        self.idb.createObjectStore('tiles');
     };
 };
 
@@ -148,7 +147,7 @@ Yolo.getImage = function(url, cb) {
 
     // Remove subdomain from tile image url
     var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
-    var store = self.idb_cache
+    var store = self.idb
         .transaction(['tiles'], 'readwrite')
         .objectStore('tiles');
     var request = store.get(imgKey);
@@ -190,12 +189,17 @@ Yolo.fetchImage = function(url, cb) {
 Yolo.saveImage = function(url, imgBlob, cb) {
     var self = this;
     var imgKey = url.split('.').slice(1).join('.').replace(/\//g, '');
-    self.idb_cache
+    self.idb
         .transaction(['tiles'], 'readwrite')
         .objectStore('tiles')
         .put(imgBlob, imgKey);
     self.getImage(url, cb);
 };
+
+
+
+
+
 
 Yolo.showControls = function() {
     if (this.selected) {
